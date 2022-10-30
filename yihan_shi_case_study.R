@@ -1,4 +1,5 @@
-library(percent2probit)
+library(tidyverse)
+library(plyr)
 # load data ---------------------------------------------------------------
 train <- read.csv("data-train.csv")
 test <- read.csv("data-test.csv")
@@ -12,28 +13,26 @@ train$C_moment_4 <- train$R_moment_4 - 4*train$R_moment_1*train$R_moment_3 + 6*(
 
 
 # ranges ------------------------------------------------------------------
-plot(density(train$St))# skewed to the right
-plot(density(train$Re)) #
-plot(density(train$Fr)) # need to transform to avoid infinity
-# 6,600ft cloud: Fr = 0.052
-# 40,000 ft cloud: Fr = 0.3
-# highest-level cloud in the atmosphere is 280,000 ft:
+plot(density(train$St))
+plot(density(train$Re)) 
+plot(density(train$Fr))
 plot(density(train$R_moment_1))
 plot(density(train$R_moment_2))
 plot(density(train$R_moment_3))
 plot(density(train$R_moment_4))
 
-
 # transformation of Fr -------------------------------------------------------
+# 6,600ft cloud: Fr = 0.052
+# 40,000 ft cloud: Fr = 0.3
+# highest possible cloud in the atmosphere is 280,000 ft: Fr = 2.08
 grav_freq <- data.frame(height = c(6600,40000), fr = c(0.052, 0.3))
 lm <- lm(fr ~ height, data = grav_freq)
 new <- data.frame(height = c(280000))
-predict(lm, newdata = new)
-
-
+pred_fr <- predict(lm, newdata = new)
+train$Fr[which(train$Fr == Inf)] <- pred_fr
 
 # fit linear regression ---------------------------------------------------
-lm1 <- lm(R_moment_1 ~ St + Re + Fr,
-          family = binomial(link = "probit"),
-          data = train)
-Percent2NED(25)
+# what to predict?
+lm1 <- lm(R_moment_1 ~ St + Re + Fr, data = train)
+pred_r1 <- predict(lm1, test)
+mean((pred_r1 - test$R_moment_1)^2)
