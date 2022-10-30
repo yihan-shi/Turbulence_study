@@ -1,4 +1,4 @@
-
+library(percent2probit)
 # load data ---------------------------------------------------------------
 train <- read.csv("data-train.csv")
 test <- read.csv("data-test.csv")
@@ -10,4 +10,30 @@ train$C_moment_2 <- train$R_moment_2 - (train$R_moment_1)^2
 train$C_moment_3 <- train$R_moment_3 - 3*train$R_moment_1*train$R_moment_2 + 2*(train$R_moment_1)^3
 train$C_moment_4 <- train$R_moment_4 - 4*train$R_moment_1*train$R_moment_3 + 6*(train$R_moment_1)^2*train$R_moment_2 -3*(train$R_moment_1)^4
 
-# 
+
+# ranges ------------------------------------------------------------------
+plot(density(train$St))# skewed to the right
+plot(density(train$Re)) #
+plot(density(train$Fr)) # need to transform to avoid infinity
+# 6,600ft cloud: Fr = 0.052
+# 40,000 ft cloud: Fr = 0.3
+# highest-level cloud in the atmosphere is 280,000 ft:
+plot(density(train$R_moment_1))
+plot(density(train$R_moment_2))
+plot(density(train$R_moment_3))
+plot(density(train$R_moment_4))
+
+
+# transformation of Fr -------------------------------------------------------
+grav_freq <- data.frame(height = c(6600,40000), fr = c(0.052, 0.3))
+lm <- lm(fr ~ height, data = grav_freq)
+new <- data.frame(height = c(280000))
+predict(lm, newdata = new)
+
+
+
+# fit linear regression ---------------------------------------------------
+lm1 <- lm(R_moment_1 ~ St + Re + Fr,
+          family = binomial(link = "probit"),
+          data = train)
+Percent2NED(25)
