@@ -36,3 +36,8 @@ train$Fr[which(train$Fr == Inf)] <- pred_fr
 lm1 <- lm(R_moment_1 ~ St + Re + Fr, data = train)
 pred_r1 <- predict(lm1, test)
 mean((pred_r1 - test$R_moment_1)^2)
+
+
+## treat Fr as categorical
+## 2 models for each raw moments (1 - prediction, 2 - inference)
+## raw_moment_1
