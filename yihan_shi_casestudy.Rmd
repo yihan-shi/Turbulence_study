@@ -1,0 +1,90 @@
+---
+title: "yihan_shi_casestudy"
+author: "Yihan Shi"
+date: "10/31/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(plyr)
+library(MASS)
+library(boot)
+library(splines)
+```
+
+```{r}
+# load data
+train <- read.csv("data-train.csv")
+test <- read.csv("data-test.csv")
+```
+
+```{r}
+# eda
+plot(dist(train$R_moment_1))
+pairs(train)
+```
+From the pair plot, there is somewhat linear relationship between St and R_moment_1. 
+
+
+### predictive modeling
+```{r}
+# start from linear model of St
+lm1 <- lm(R_moment_1 ~ poly(St,4), data = train)
+summary(lm1)
+(mse <- mean(lm1$residuals^2))
+
+plot(R_moment_1 ~ St,
+     data = train,
+     col = "darkgrey")
+lines(seq(from = range(train$St)[1], to = range(train$St)[2], by = 0.1), 
+      predict(lm1, list(St = seq(from = range(train$St)[1], 
+                                 to = range(train$St)[2], by = 0.1))),
+      col = "red",
+      type = "l")
+```
+Linear regression or polynomial regression with St alone is not suitable.
+
+```{r}
+# start from linear model of St
+# lm2 <- lm(R_moment_1 ~ Re, data = train)
+lm2 <- lm(R_moment_1 ~ as.factor(Re), data = train)
+summary(lm2)
+(mse <- mean(lm2$residuals^2))
+plot(R_moment_1 ~ as.factor(Re),
+     data = train)
+```
+The relationship between Re and R_moment_1 is not linear. R^2 is only 0.6 and MSE = 0.0012. Setting Re to be categorical improves the model accuracy. R^2 is 0.889 and MSE = 0.0003 
+
+```{r}
+lm3 <- lm(R_moment_1 ~ as.factor(Fr), data = train)
+summary(lm3)
+(mse <- mean(lm3$residuals^2))
+plot(R_moment_1 ~ as.factor(Fr),
+     data = train)
+```
+```{r}
+lm4 <- lm(R_moment_1 ~ as.factor(Fr) + as.factor(Re) + poly(St, 4), data = train)
+summary(lm4)
+(mse <- mean(lm4$residuals^2))
+plot(lm4)
+```
+This linear model gives us a decent R^2 (0.9233) and MSE (0.0002)
+
+### statistical inference
+```{r}
+
+```
+
+
+```{r}
+train$C_moment_1 <- 0
+train$C_moment_2 <- train$R_moment_2 - (train$R_moment_1)^2
+train$C_moment_3 <- train$R_moment_3 - 3*train$R_moment_1*train$R_moment_2 + 2*(train$R_moment_1)^3
+train$C_moment_4 <- train$R_moment_4 - 4*train$R_moment_1*train$R_moment_3 + 6*(train$R_moment_1)^2*train$R_moment_2 -3*(train$R_moment_1)^4
+```
+
