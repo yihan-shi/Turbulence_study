@@ -15,143 +15,158 @@ library(plyr)
 library(gam)
 library(boot)
 library(splines)
+library(kableExtra)
 ```
 
 ```{r}
 # load data
-train <- read.csv("data-train.csv")
-test <- read.csv("data-test.csv")
 set.seed(1)
+train <- read.csv("data-train.csv")
+test <- read.csv("data-test.csv") # will not use
+sub_train <- sample(1:nrow(train), nrow(train)*0.7)
+sub_test <- train[-sub_train,]
+sub_train <- train[sub_train,]
+sub_train$Fr <- as.factor(sub_train$Fr)
+sub_train$Re <- as.factor(sub_train$Re)
+sub_test$Fr <- as.factor(sub_test$Fr)
+sub_test$Re <- as.factor(sub_test$Re)
 ```
 
-```{r}
+```{r echo = FALSE}
 # eda
-plot(dist(train$R_moment_1))
-pairs(train)
+plot(dist(sub_train$R_moment_1))
+pairs(sub_train)
 ```
 From the pair plot, there is somewhat linear relationship between St and R_moment_1. 
 
 
 ## predictive modeling
 ### linear regression
-```{r}
+```{r echo = FALSE}
 # start from linear model of St
 # fit model
-lm1 <- lm(R_moment_1 ~ poly(St,1), data = train)
+lm1 <- lm(R_moment_1 ~ St, data = sub_train)
 summary(lm1)
-(mse <- mean(lm1$residuals^2))
+lm1_pred <- predict(lm1, newdata = sub_test)
+mean((sub_test$R_moment_1 - lm1_pred)^2)
 
 plot(R_moment_1 ~ St,
-     data = train,
+     data = sub_train,
      col = "darkgrey")
-lines(seq(from = range(train$St)[1], to = range(train$St)[2], by = 0.1), 
-      predict(lm1, list(St = seq(from = range(train$St)[1], 
-                                 to = range(train$St)[2], by = 0.1))),
+lines(seq(from = range(sub_train$St)[1], to = range(sub_train$St)[2], by = 0.1), 
+      predict(lm1, list(St = seq(from = range(sub_train$St)[1], 
+                                 to = range(sub_train$St)[2], by = 0.1))),
       col = "red",
       type = "l")
 ```
 Linear regression or polynomial regression with St alone is not suitable.
 
-```{r}
-# start from linear model of St
-# lm2 <- lm(R_moment_1 ~ Re, data = train)
-lm2 <- lm(R_moment_1 ~ as.factor(Re), data = train)
+```{r echo = FALSE}
+# start from linear model of Re
+# lm2 <- lm(R_moment_1 ~ Re, data = sub_train)
+lm2 <- lm(R_moment_1 ~ as.factor(Re), data = sub_train)
 summary(lm2)
-(mse <- mean(lm2$residuals^2))
+lm2_pred <- predict(lm2, newdata = sub_test)
+mean((sub_test$R_moment_1 - lm2_pred)^2)
 plot(R_moment_1 ~ as.factor(Re),
-     data = train)
+     data = sub_train)
 ```
 The relationship between Re and R_moment_1 is not linear. R^2 is only 0.6 and MSE = 0.0012. Setting Re to be categorical improves the model accuracy. R^2 is 0.889 and MSE = 0.0003 
 
-```{r}
-lm3 <- lm(R_moment_1 ~ as.factor(Fr), data = train)
+```{r echo = FALSE}
+lm3 <- lm(R_moment_1 ~ as.factor(Fr), data = sub_train)
 summary(lm3)
-(mse <- mean(lm3$residuals^2))
+lm3_pred <- predict(lm3, newdata = sub_test)
+mean((sub_test$R_moment_1 - lm3_pred)^2)
 plot(R_moment_1 ~ as.factor(Fr),
-     data = train)
+     data = sub_train)
 ```
+
+### Linear model
+Log transformation because residual plot is V-shaped.
 ```{r}
 # find out the optimal polynomial degrees for St
 degrees <- rep(NA, 10)
 
 for (i in 1:10) {
-fit <- glm(R_moment_1 ~ as.factor(Fr) + as.factor(Re) + poly(St, i), data = train)
-degrees[i] <- cv.glm(train, fit, K = 5)$delta[1]
+fit <- glm(log(R_moment_1) ~ Fr + Re + poly(St, i), data = sub_train)
+degrees[i] <- cv.glm(sub_train, fit, K = 5)$delta[1]
 }
 
 plot(degrees, xlab = "Polynomial", ylab = "MSE", type = "l")
 
-lm4 <- lm(R_moment_1 ~ as.factor(Fr) + as.factor(Re) + poly(St, 2), data = train)
+lm4 <- lm(log(R_moment_1) ~ Fr + Re + poly(St, 2), data = sub_train)
 summary(lm4)
-(mse <- mean(lm4$residuals^2))
+lm4_pred <- predict(lm4, newdata = sub_test)
+mean((sub_test$R_moment_1 - exp(lm4_pred))^2)
 plot(lm4)
 ```
-This linear model gives us a decent R^2 (0.9243) and MSE (0.0002). However, 
-the residuals are not randomly scattered, so linear regression might not be 
-suitable.
+This linear model gives us a decent R^2 (0.99) and MSE (0.0001). 
 
 ```{r}
 # remove high leverage point and refit
-HighLeverage <- cooks.distance(lm4) > (4/nrow(train))
+HighLeverage <- cooks.distance(lm4) > (4/nrow(sub_train))
 LargeResiduals <- rstudent(lm4) > 3
-train_2 <- train[!HighLeverage & !LargeResiduals,]
-lm5 <-lm(R_moment_1 ~ as.factor(Fr) + as.factor(Re) + poly(St, 2), data = train_2)
+train_2 <- sub_train[!HighLeverage & !LargeResiduals,]
+lm5 <-lm(log(R_moment_1) ~ Fr + Re + poly(St, 2), data = train_2)
 summary(lm5)
-(mse <- mean(lm5$residuals^2))
+lm5_pred <- predict(lm5, newdata = sub_test)
+mean((sub_test$R_moment_1 - exp(lm5_pred))^2)
 plot(lm5)
 ```
-After removing data of both high leverage and residual, R^2 (0.95) slightly improved, and MSE decreases to 0.00014.
-
-However, we might not want to exclude these data since they take up 7.8% of the full training data.
+After removing data of both high leverage and residual, R^2 (0.95) slightly improved, and MSE remains similar as 0.00012. However, we might not want to exclude these data since they take up 7% of the full training data.
 
 ### natural spline
 ```{r}
-ns_1 <- lm(R_moment_1 ~ ns(St, df = 4) + as.factor(Fr) + as.factor(Re),
-           data = train)
+ns_1 <- lm(log(R_moment_1) ~ ns(St, df = 4) + Fr + Re,
+           data = sub_train)
 summary(ns_1)
-(mse <- mean(ns_1$residuals^2))
-# St.grid <- seq(from = range(train$St)[1], to = range(train$St)[2])
+ns_1_pred <- predict(ns_1, newdata = sub_test)
+mean((sub_test$R_moment_1 - exp(ns_1_pred))^2)
+# St.grid <- seq(from = range(sub_train$St)[1], to = range(sub_train$St)[2])
 # pred_1 <- predict(ns_1, newdata = list(St = St.grid, 
-#                                        Fr = as.factor(train$Fr),
-#                                        Re = as.factor(train$Re)), se = TRUE)
-# plot(train$St, train$R_moment_1, col = "gray")
+#                                        Fr = as.factor(sub_train$Fr),
+#                                        Re = as.factor(sub_train$Re)), se = TRUE)
+# plot(sub_train$St, sub_train$R_moment_1, col = "gray")
 # lines(St.grid, pred_1$fit, col = "red", lwd = 2)
 ```
-### smooth spline (Weird)
-```{r}
-sm_sp <- smooth.spline(train$St, 
-                       train$R_moment_1, 
-                       train$Re,
-                       cv = TRUE)
-sm_sp$df
-(mse <- mean(sm_sp$residuals^2))
-plot(train$St, train$R_moment_1, col = "gray")
-lines(sm_sp, col = "blue", lwd = 2)
-```
-## Prediction
+Natural spline achieves a Adjusted R-squared of 0.997 and MSE as low as  7.926869e-05.
 
 ### GAM
 
 ```{r}
-gam_train <- train
-gam_train$Fr <- as.factor(train$Fr)
-gam_train$Re <- as.factor(train$Re)
-g <- gam(R_moment_1 ~ s(St, 4) + Re + Fr,
-           data = gam_train)
+# g <- gam(log(R_moment_1) ~ s(St, bs = "cr") + Re + Fr,
+#            data = sub_train)
+g <- gam(log(R_moment_1) ~ s(St, 3) + Re + Fr,
+           data = sub_train)
 par(mfrow = c(1,3))
-plot(g, se = TRUE, col = "blue", all.terms = TRUE)
-summary(gam)
+plot(g, se = TRUE, col = "blue")
+summary(g)
 ```
 
 ```{r}
-pred_gam <- predict(gam)
-(mean((train$R_moment_1 - pred_gam)^2)) 
+gam_pred <- predict(g, newdata = sub_test)
+mean((sub_test$R_moment_1 - exp(gam_pred))^2)
+```
+GAM achieves MSE of 0.0001 and R^2 = 0.997
+
+```{r}
+# make a MSE table
+models <- c("Linear regression", "Nataural spline" ,"Generalized additive model")
+mse <- c(mean((sub_test$R_moment_1 - exp(lm4_pred))^2), 
+         mean((sub_test$R_moment_1 - exp(ns_1_pred))^2),
+         mean((sub_test$R_moment_1 - exp(gam_pred))^2))
+adj.R <- c(0.996, 0.9965, 0.997)
+df <- data.frame(models, mse, adj.R)
+df %>% 
+  kbl() %>% 
+  kable_styling()
 ```
 
 ```{r}
-train$C_moment_1 <- 0
-train$C_moment_2 <- train$R_moment_2 - (train$R_moment_1)^2
-train$C_moment_3 <- train$R_moment_3 - 3*train$R_moment_1*train$R_moment_2 + 2*(train$R_moment_1)^3
-train$C_moment_4 <- train$R_moment_4 - 4*train$R_moment_1*train$R_moment_3 + 6*(train$R_moment_1)^2*train$R_moment_2 -3*(train$R_moment_1)^4
+sub_train$C_moment_1 <- 0
+sub_train$C_moment_2 <- sub_train$R_moment_2 - (sub_train$R_moment_1)^2
+sub_train$C_moment_3 <- sub_train$R_moment_3 - 3*sub_train$R_moment_1*sub_train$R_moment_2 + 2*(sub_train$R_moment_1)^3
+sub_train$C_moment_4 <- sub_train$R_moment_4 - 4*sub_train$R_moment_1*sub_train$R_moment_3 + 6*(sub_train$R_moment_1)^2*sub_train$R_moment_2 -3*(sub_train$R_moment_1)^4
 ```
 
