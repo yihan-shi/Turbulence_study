@@ -19,6 +19,11 @@ test <- read.csv("data-test.csv")
 ```
 
 ```{r}
+train$Fr_factor <- factor(train$Fr)
+test$Fr_factor <- factor(test$Fr)
+```
+
+```{r}
 #convert to central moments
 train$C_moment_1 <- 0
 train$C_moment_2 <- train$R_moment_2 - (train$R_moment_1)^2
@@ -27,8 +32,10 @@ train$C_moment_4 <- train$R_moment_4 - 4*train$R_moment_1*train$R_moment_3 + 6*(
 ```
 
 ```{r}
-train$Fr_factor <- factor(train$Fr)
-test$Fr_factor <- factor(test$Fr)
+set.seed(1)
+sub_train <- sample(1:nrow(train), nrow(train)*0.7) ## split data into train and test
+sub_test <- train[-sub_train,]
+sub_train <- train[sub_train,]
 ```
 
 ```{r}
@@ -45,23 +52,37 @@ plot(train$Re, log(train$R_moment_2), type = "b")
 
 ```{r}
 # least square model
-r2_ls_1 <- lm(log(R_moment_2) ~ St + Re + Fr_factor, data = train)
-r2_ls <- lm(log(R_moment_2) ~ St + Re + Fr_factor + Re*Fr_factor, data = train)
+r2_ls <- lm(log(R_moment_2) ~ St + Re + Fr_factor, data = sub_train)
+r2_ls_int <- lm(log(R_moment_2) ~ St + Re + Fr_factor + Re*Fr_factor, data = sub_train)
 summary(r2_ls)
-ls_pred <- predict(r2_ls, newdata = train)
-mean((train$R_moment_2 - ls_pred)^2)
+summary(r2_ls_int)
+```
+
+```{r}
+ls_pred <- predict(r2_ls, newdata = sub_test)
+mean((sub_test$R_moment_2 - exp(ls_pred))^2)
+```
+
+```{r}
+ls_pred_int <- predict(r2_ls_int, newdata = sub_test)
+mean((sub_test$R_moment_2 - exp(ls_pred_int))^2)
 ```
 
 ```{r}
 par(mfrow=c(2,2))
 plot(r2_ls)
 ```
-
+```{r}
+par(mfrow=c(2,2))
+plot(r2_ls_int)
+```
 
 ```{r}
 #ridge regression
-train.matrix <- model.matrix (log(R_moment_2) ~ St + Re + Fr_factor + Re*Fr_factor,train)[,-1]
-train.r2 <- train$R_moment_2
+train.matrix <- model.matrix (log(R_moment_2) ~ St + Re + Fr_factor + Re*Fr_factor, sub_train)[,-1]
+test.matrix <- model.matrix (log(R_moment_2) ~ St + Re + Fr_factor + Re*Fr_factor, sub_test)[,-1]
+test.r2 <- sub_test$R_moment_2
+train.r2 <- sub_train$R_moment_2
 
 set.seed (1)
 cv.out.ridge <- cv.glmnet (train.matrix,train.r2,alpha = 0)
@@ -74,16 +95,30 @@ In the plot above, the numbers across the top of the plot are the number of nonz
 bestlam.ridge <- cv.out.ridge$lambda.min
 r2_ridge <- glmnet(train.matrix,train.r2,alpha=0,lambda=bestlam.ridge)
 
-ridge.pred <- predict(r2_ridge, s = bestlam.ridge, newx = train.matrix)
-mean((ridge.pred - train.r2)^2)
+ridge.pred <- predict(r2_ridge, s = bestlam.ridge, newx = test.matrix)
+mean((exp(ridge.pred) - test.r2)^2)
 ```
 
+```{r}
+set.seed(1)
+cv.out.lasso <- cv.glmnet (train.matrix,train.r2,alpha =1)
+plot(cv.out.lasso)
+```
+
+```{r}
+bestlam.lasso <- cv.out.lasso$lambda.min
+r2.lasso <- glmnet(train.matrix,train.r2,alpha=1,lambda=bestlam.ridge)
+
+lasso.pred <- predict(r2.lasso,s=bestlam.lasso,newx=test.matrix)
+mean((exp(lasso.pred)-test.r2)^2)
+```
 ## Non linear modeling
 
+### Cubic spline
 ```{r}
 RSS <- rep(0,15)
 for (i in 4:15) {
-model.fit <- glm(log(R_moment_2) ~ bs(St, df = i) + Re + Fr_factor + Re*Fr_factor, data = train)
+model.fit <- glm(log(R_moment_2) ~ bs(St, df = i) + Re + Fr_factor + Re*Fr_factor, data = sub_train)
 RSS[i] <- sum(model.fit$residuals^2)
 
 }
@@ -96,8 +131,8 @@ title("RSS vs. Degrees of freedom")
 set.seed(1)
 cv.err <- rep(0,15)
 for (i in 4:15) {
-model.fit <- glm(log(R_moment_2) ~ bs(St, df = i) + Re + Fr_factor + Re*Fr_factor, data = train)
-cv.err[i] <- cv.glm(train, model.fit, K=10)$delta[1]
+model.fit <- glm(log(R_moment_2) ~ bs(St, df = i) + Re + Fr_factor + Re*Fr_factor, data = sub_train)
+cv.err[i] <- cv.glm(sub_train, model.fit, K=5)$delta[1]
 }
 
 plot(4:15, cv.err[4:15], type="b", xlab="Degrees of freedom", ylab="Cross validation error")
@@ -105,8 +140,8 @@ plot(4:15, cv.err[4:15], type="b", xlab="Degrees of freedom", ylab="Cross valida
 
 
 ```{r}
-r2_spline <- glm(log(R_moment_2) ~ bs(St, df = 7) + Re + Fr_factor + Re*Fr_factor, data = train)
-attr(bs(train$St, df = 7), "knots")
+r2_spline <- glm(log(R_moment_2) ~ bs(St, df = 6) + Re + Fr_factor + Re*Fr_factor, data = sub_train)
+attr(bs(sub_train$St, df = 6), "knots")
 
 summary(r2_spline)
 ```
@@ -117,10 +152,15 @@ plot(r2_spline)
 ```
 
 ```{r}
-r2_gam1 <- gam(log(R_moment_2) ~ s(St, 3) + Re + Fr_factor + Re*Fr_factor, data = train)
-r2_gam2 <- gam(log(R_moment_2) ~ s(St, 5) + Re + Fr_factor+ Re*Fr_factor, data = train)
-r2_gam3 <- gam(log(R_moment_2) ~ s(St, 7) + Re + Fr_factor+ Re*Fr_factor, data = train)
-r2_gam4 <- gam(log(R_moment_2) ~ s(St, 9) + Re + Fr_factor+ Re*Fr_factor, data = train)
+spline_pred <- predict(r2_spline, newdata = sub_test)
+mean((sub_test$R_moment_2 - exp(spline_pred))^2)
+```
+
+```{r}
+r2_gam1 <- gam(log(R_moment_2) ~ s(St, 3) + Re + Fr_factor + Re*Fr_factor, data = sub_train)
+r2_gam2 <- gam(log(R_moment_2) ~ s(St, 5) + Re + Fr_factor+ Re*Fr_factor, data = sub_train)
+r2_gam3 <- gam(log(R_moment_2) ~ s(St, 7) + Re + Fr_factor+ Re*Fr_factor, data = sub_train)
+r2_gam4 <- gam(log(R_moment_2) ~ s(St, 9) + Re + Fr_factor+ Re*Fr_factor, data = sub_train)
 
 ```
 
@@ -145,13 +185,22 @@ plot(r2_gam4, se = TRUE, col = "blue")
 ```{r}
 summary(r2_gam2)
 ```
+
 ```{r}
-r2_gam2_no_int <- gam(log(R_moment_2) ~ s(St, 5) + Re + Fr_factor, data = train)
+r2_gam3_no_int <- gam(log(R_moment_2) ~ s(St, 7) + Re + Fr_factor, data = sub_train)
 ```
 
 ```{r}
 anova(r2_gam2_no_int, r2_gam2, test = "F")
 ```
 
+```{r}
+gam_pred <- predict(r2_gam3, newdata = sub_test)
+mean((sub_test$R_moment_2 - exp(gam_pred))^2)
+```
 
+```{r}
+gam_pred_no_int <- predict(r2_gam3_no_int, newdata = sub_test)
+mean((sub_test$R_moment_2 - exp(gam_pred_no_int))^2)
+```
 
