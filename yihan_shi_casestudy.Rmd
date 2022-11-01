@@ -112,9 +112,10 @@ for(i in 1:K){
     
     #use k-fold cv to evaluate models
     for (j in 1:df){
-        fit.train <- glm(R_moment_1 ~ ns(St, df = j) + Fr + Re + Fr * Re,
+        fit.train <- lm(R_moment_1 ~ ns(St, df = j) + Fr + Re + Fr * Re,
            data = trainData)
-        adj.r2[i,j] <- with(summary(fit.train), 1 - deviance/null.deviance)
+        # adj.r2[i,j] <- with(summary(fit.train), 1 - deviance/null.deviance)
+        adj.r2[i,j] <- summary(fit.train)$adj.r.squared
         fit.test <- predict(fit.train, newdata=testData)
         mse[i,j] <- mean((exp(fit.test)-testData$R_moment_1)^2) 
     }
