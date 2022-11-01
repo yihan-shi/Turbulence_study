@@ -1,0 +1,122 @@
+---
+title: "case study"
+author: "edna zhang"
+output: html_document
+date: "2022-10-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+train <- read.csv("data-train.csv")
+test <- read.csv("data-test.csv")
+summary(train)
+```
+
+```{r}
+table(train$St)
+```
+
+```{r}
+table(train$Re)
+```
+
+```{r}
+table(train$Fr)
+```
+
+```{r}
+hist(train$R_moment_3)
+```
+```{r}
+plot(train$St, train$R_moment_3)
+```
+```{r}
+plot(train$Fr_level, train$R_moment_3)
+```
+```{r}
+plot(train$Re_level, train$R_moment_3)
+```
+```{r}
+train$Fr_level[transformed_train$Fr == 0.052] <- 1
+train$Fr_level[transformed_train$Fr == 0.3] <- 2
+train$Fr_level[transformed_train$Fr == Inf] <- 3
+```
+
+```{r}
+train$Re_level[transformed_train$Re == 90] <- 1
+train$Re_level[transformed_train$Re == 224] <- 2
+train$Re_level[transformed_train$Re == 398] <- 3
+train
+```
+
+```{r}
+library(fastDummies)
+```
+
+```{r}
+train <- fastDummies::dummy_cols(train, select_columns ="Re")
+train
+```
+
+```{r}
+linear <- lm(R_moment_3~St+Re_90+Re_224+Re_398+Fr_level, data=train)
+summary(linear)
+```
+
+```{r}
+plot(linear)
+```
+
+```{r}
+linear2 <- lm(R_moment_3~St+Re_level+Fr_level, data=train)
+summary(linear2)
+```
+
+```{r}
+plot(linear2)
+```
+```{r}
+interaction <- lm(R_moment_3 ~ St+Re_level+Fr_level+St*Re_level+St*Fr_level+Re_level*Fr_level, data=train)
+summary(interaction)
+```
+
+```{r}
+plot(interaction)
+```
+
+```{r}
+interaction2 <- lm(R_moment_3 ~ St+Re_level+Fr_level+St*Fr_level+Re_level*Fr_level, data=train)
+summary(interaction2)
+```
+
+```{r}
+plot(interaction2)
+```
+
+
+```{r}
+interaction3 <- lm(R_moment_3 ~ St+Re_level+Fr_level+Re_level*Fr_level, data=train)
+summary(interaction3)
+```
+
+```{r}
+plot(interaction3)
+```
+
+```{r}
+poly1 <- glm(R_moment_3 ~ poly(St,2)+Re_level+Fr_level+Re_level*Fr_level,data=train)
+poly2 <- glm(R_moment_3 ~ poly(Re_level,2)+Re_level+Fr_level+Re_level*Fr_level,data=train)
+poly3 <- glm(R_moment_3 ~ poly(Fr_level,2)+Re_level+Fr_level++Re_level*Fr_level,data=train)
+anova(poly1, poly2, poly3)
+```
+
+```{r}
+plot(poly2)
+```
+
+spline
+
+

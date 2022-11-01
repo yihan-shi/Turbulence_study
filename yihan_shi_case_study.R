@@ -25,14 +25,22 @@ plot(density(train$R_moment_4))
 # 6,600ft cloud: Fr = 0.052
 # 40,000 ft cloud: Fr = 0.3
 # highest possible cloud in the atmosphere is 280,000 ft: Fr = 2.08
-grav_freq <- data.frame(height = c(6600,40000), fr = c(0.052, 0.3))
-lm <- lm(fr ~ height, data = grav_freq)
-new <- data.frame(height = c(280000))
-pred_fr <- predict(lm, newdata = new)
-train$Fr[which(train$Fr == Inf)] <- pred_fr
+# grav_freq <- data.frame(height = c(6600,40000), fr = c(0.052, 0.3))
+# lm <- lm(fr ~ height, data = grav_freq)
+# new <- data.frame(height = c(280000))
+# pred_fr <- predict(lm, newdata = new)
+# train$Fr[which(train$Fr == Inf)] <- pred_fr
 
 # fit linear regression ---------------------------------------------------
-# what to predict?
-lm1 <- lm(R_moment_1 ~ St + Re + Fr, data = train)
-pred_r1 <- predict(lm1, test)
-mean((pred_r1 - test$R_moment_1)^2)
+# Fr as categorical
+lm1 <- lm(R_moment_1 ~ St + Re + as.factor(Fr), data = train)
+summary(lm1)
+# Adjusted R-squared: 0.6403. Because there are only 89 observations, there can 
+# be high variance
+
+
+
+## treat Fr as categorical
+## 2 models for each raw moments (1 - prediction, 2 - inference)
+## raw_moment_1
+
