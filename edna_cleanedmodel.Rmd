@@ -1,0 +1,118 @@
+---
+title: "case study"
+author: "edna zhang"
+output: html_document
+date: "2022-10-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("boot")
+library("glmnet")
+library("gam")
+```
+
+
+```{r}
+train <- read.csv("data-train.csv")
+test <- read.csv("data-test.csv")
+summary(train)
+```
+
+```{r}
+set.seed(1)
+sub_train <- sample(1:nrow(train), nrow(train)*0.7) ## split data into train and test
+sub_test <- train[-sub_train,]
+sub_train <- train[sub_train,]
+```
+
+```{r}
+hist(train$St)
+```
+
+
+```{r}
+hist(train$R_moment_3)
+```
+```{r}
+linear <- lm(log(R_moment_3)~log(St)+as.factor(Re)+as.factor(Fr), data=sub_train)
+summary(linear)
+```
+
+```{r}
+plot(linear)
+```
+
+```{r}
+preds <- predict(linear, newdata = sub_test)
+mean((sub_test$R_moment_3-exp(preds))^2)
+```
+
+```{r}
+interaction <- lm(log(R_moment_3)~log(St)+as.factor(Re)+as.factor(Fr)+as.factor(Re)*as.factor(Fr), data=sub_train)
+summary(interaction)
+```
+
+```{r}
+plot(interaction)
+```
+```{r}
+preds <- predict(interaction, newdata = sub_test)
+mean((test.r3-exp(preds))^2)
+```
+
+```{r}
+rss <- rep(0,15)
+cv.error <- rep(0,15)
+for (i in 4:15) {
+  model.fit <- glm(log(R_moment_3) ~ ns(St, df = i)+as.factor(Re)+as.factor(Fr)+as.factor(Re)*as.factor(Fr), data = sub_train)
+  rss[i] <- sum(model.fit$residuals^2)
+  cv.error[i] <- cv.glm(sub_train, model.fit, K=5)$delta[1]
+}
+plot(4:15, rss[4:15], type="b", xlab="Degrees of freedom", ylab = "RSS")
+title("RSS vs. Degrees of freedom")
+```
+```{r}
+plot(4:15, cv.error[4:15], type="b", xlab="Degrees of freedom", ylab = "Cross Validation Error")
+title("Cross Validation Error vs. Degrees of freedom")
+```
+```{r}
+spline <- glm(log(R_moment_3) ~ ns(St, df = 8)+as.factor(Re)+as.factor(Fr)+as.factor(Re)*as.factor(Fr), data = sub_train)
+```
+
+```{r}
+summary(spline)
+```
+
+
+```{r}
+preds <- predict(spline, newdata=sub_test)
+mean((sub_test$R_moment_3-exp(preds))^2)
+```
+
+```{r}
+aic <- rep(0,15)
+for (i in 4:15) {
+  model.fit <- gam(log(R_moment_3) ~ s(St, df = i)+as.factor(Re)+as.factor(Fr)+as.factor(Re)*as.factor(Fr), data = sub_train)
+  aic[i] <- sum(model.fit$aic)
+}
+plot(4:15, rss[4:15], type="b", xlab="Degrees of freedom", ylab = "RSS")
+title("AIC vs. Degrees of freedom")
+```
+```{r}
+gam <- gam(log(R_moment_3) ~ s(St, df =12)+as.factor(Re)+as.factor(Fr)+as.factor(Re)*as.factor(Fr), data = sub_train)
+plot.Gam(gam, se = TRUE, col = "red")
+```
+
+```{r}
+summary(gam)
+```
+
+```{r}
+preds <- predict(gam, newdata=sub_test)
+mean((sub_test$R_moment_3 - exp(preds))^2)
+```
+
