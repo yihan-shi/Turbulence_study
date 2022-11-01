@@ -84,6 +84,7 @@ plot(R_moment_1 ~ as.factor(Fr),
 
 ### Linear model
 Log transformation because residual plot is V-shaped.
+Using cross-validation, we decided that the optimal polynomial order for St is 2.
 ```{r}
 # find out the optimal polynomial degrees for St
 degrees <- rep(NA, 10)
@@ -152,7 +153,7 @@ GAM achieves MSE of 0.0001 and R^2 = 0.997
 
 ```{r}
 # make a MSE table
-models <- c("Linear regression", "Nataural spline" ,"Generalized additive model")
+models <- c("Polynomial regression", "Nataural spline" ,"Generalized additive model")
 mse <- c(mean((sub_test$R_moment_1 - exp(lm4_pred))^2), 
          mean((sub_test$R_moment_1 - exp(ns_1_pred))^2),
          mean((sub_test$R_moment_1 - exp(gam_pred))^2))
