@@ -4,6 +4,7 @@ author: "Yihan Shi"
 date: "10/31/2022"
 output: pdf_document
 ---
+# Introduction
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -18,7 +19,7 @@ library(splines)
 library(kableExtra)
 ```
 
-```{r}
+```{r echo = FALSE}
 # load data
 set.seed(1)
 train <- read.csv("data-train.csv")
@@ -153,16 +154,26 @@ GAM achieves MSE of 0.0001 and R^2 = 0.997
 
 ```{r}
 # make a MSE table
-models <- c("Polynomial regression", "Nataural spline" ,"Generalized additive model")
+models <- c("Polynomial regression", 
+            "Polynomial regression (without high leverage and residual)",
+            "Natural spline", 
+            "Generalized additive model")
 mse <- c(mean((sub_test$R_moment_1 - exp(lm4_pred))^2), 
+         mean((sub_test$R_moment_1 - exp(lm5_pred))^2), 
          mean((sub_test$R_moment_1 - exp(ns_1_pred))^2),
          mean((sub_test$R_moment_1 - exp(gam_pred))^2))
-adj.R <- c(0.996, 0.9965, 0.997)
-df <- data.frame(models, mse, adj.R)
+adj.R <- c(0.996, 0.9965, 0.997, 0.997)
+formula <- c("log(R_moment_1) ~ Fr + Re + poly(St, 2)",
+             "log(R_moment_1) ~ Fr + Re + poly(St, 2)",
+             "log(R_moment_1) ~ ns(St, df = 4) + Fr + Re",
+             "log(R_moment_1) ~ s(St, 3) + Re + Fr"
+             )
+df <- data.frame(models, formula, mse, adj.R)
 df %>% 
   kbl() %>% 
   kable_styling()
 ```
+
 
 ```{r}
 sub_train$C_moment_1 <- 0
