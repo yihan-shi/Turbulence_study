@@ -25,25 +25,24 @@ library(glmnet)
 
 ```{r}
 # load data
-set.seed(1)
 train <- read.csv("data-train.csv")
 test <- read.csv("data-test.csv") 
 
 train$Fr <- 25/(1+exp(2*(0.3 - train$Fr))) # cite, justify the choice
 test$Fr <- 25/(1+exp(2*(0.3 - test$Fr)))
-
 ```
 
 ```{r echo = FALSE}
 # eda
 # plot(dist(sub_train$R_moment_1))
-pairs(train)
+# pairs(train)
 ```
 
 From the pair plot, there is somewhat linear or polynomial relationship between St and R_moment_1. 
 
 ### Linear regression
 ```{r}
+set.seed(1)
 df.shuffled <- train[sample(nrow(train)),]
 K <- 5
 
@@ -63,9 +62,9 @@ for(i in 1:K){
     trainData <- df.shuffled[-testIndexes, ]
     
     #use k-fold cv to evaluate models
-    fit.train <-  lm(log(R_moment_1) ~ St + Re + as.factor(Fr) + Re*as.factor(Fr), data = trainData)
+    fit.train <-  lm(log(R_moment_1) ~ St + Re + Fr + Re*Fr, data = trainData)
     fit.test <- predict(fit.train, newdata=testData)
-    mse[i] <- mean((exp(fit.test)-testData$R_moment_1)^2) 
+    mse[i] <- mean((exp(fit.test-testData$R_moment_1))^2) 
     adj.r2[i] <- summary(fit.train)$adj.r.squared
 }
 
@@ -76,6 +75,7 @@ mse_adjr2 <- mean(adj.r2)
 
 ### Polynomial regression
 ```{r}
+set.seed(1)
 #randomly shuffle data
 df.shuffled <- train[sample(nrow(train)),]
 
@@ -89,7 +89,7 @@ degree <- 10
 folds <- cut(seq(1,nrow(df.shuffled)),breaks=K,labels=FALSE)
 
 #create object to hold MSE's of models
-mse <- matrix(data=NA,nrow=K,ncol=degree)
+mse = matrix(data=NA,nrow=K,ncol=degree)
 adj.r2 <- matrix(data=NA,nrow=K,ncol=degree)
 
 #Perform K-fold cross validation
@@ -102,10 +102,9 @@ for(i in 1:K){
     
     #use k-fold cv to evaluate models
     for (j in 1:degree){
-        fit.train <- lm(R_moment_1 ~ poly(St,j) + Re+ Fr + Re*Fr, 
-                       data = trainData)
+        fit.train = lm(log(R_moment_1) ~ poly(St,j) + Re + Fr + Re*Fr, data = trainData)
         fit.test <- predict(fit.train, newdata=testData)
-        mse[i,j] <- mean((fit.test-testData$R_moment_1)^2) 
+        mse[i,j] <- mean((exp(fit.test-testData$R_moment_1))^2) 
         adj.r2[i,j] <- summary(fit.train)$adj.r.squared
     }
 }
@@ -116,11 +115,10 @@ min_mse_linear <- min(mse)
 mean_r2_linear <- colMeans(adj.r2)
 max_r2_linear <- max(adj.r2)
 
-
 plot(x, mean_mse_linear, type = "l", xlab = "Polynomial Degree", ylab = "MSE", main = "Polynomial regression")
 plot(c(1:10), mean_r2_linear, xlab = "Polynomial Degree", ylab = "Adjusted R^2", main = "Polynomial regression", type = "l")
 ```
-Using cross-validation with 5 folds, we see the adjusted $R^2$ decreases as polynomial degree increases, while MSE increases as polynomial degree increases. The lowest MSE is achieved at degree of 4. We found that a linear regression is not suitable. Even though it has a relatively high adjusted $R^2$, the MSE is way higher than other polynomial models. We decided that the optimal polynomial order for St is 4. After degree of 4, the adjusted $R^2$ starts to decrease quickely. 
+Using cross-validation with 5 folds, we see the adjusted $R^2$ decreases as polynomial degree increases, while the minimum MSE is achieved with order 2 polynomial on St. Linear regression is not suitable. Since adjusted $R^2$ is decent for any degree that we tested, we decided that the optimal polynomial order for St is 2.
 
 We tried removing data of both high leverage and residual. However, this didn't change the MSE and adjusted $R^2$ greatly. Since these observations take up 7% of the full training data, we decided that we don't want to exclude them.
 
@@ -143,12 +141,12 @@ for(i in 1:K){
     
     #use k-fold cv to evaluate models
     for (j in 1:df){
-        fit.train <- glm(R_moment_1 ~ ns(St, df = j) + Fr + Re + Fr * Re,
+        fit.train <- glm(log(R_moment_1) ~ ns(St, df = j) + Fr + Re + Fr * Re,
            data = trainData)
         adj.r2[i,j] <- with(summary(fit.train), 1 - deviance/null.deviance)
         # adj.r2[i,j] <- summary(fit.train)$adj.r.squared
         fit.test <- predict(fit.train, newdata=testData)
-        mse[i,j] <- mean((fit.test-testData$R_moment_1)^2) 
+        mse[i,j] <- mean((exp(fit.test-testData$R_moment_1))^2) 
     }
 }
 
@@ -157,21 +155,22 @@ mean_mse_ns <- colMeans(mse)
 min_mse_ns <- min(mse)
 mean_r2_ns <- colMeans(adj.r2)
 max_r2_ns <- max(adj.r2)
+
 plot(c(1:df), mean_mse_ns, xlab = "Degree of Freedom", ylab = "MSE", 
      type = "l", main = "Natural spline")
 plot(c(1:df), mean_r2_ns, xlab = "Degree of Freedom", ylab = "Adjusted R^2",
      type = "l", main = "Natural spline")
 ```
-Using cross-validation with 5 folds, we see the adjusted $R^2$ increases as the degree of freedom increases, and the lowest MSE is achieved at degree of 13. The optimal polynomial degrees of freedom for St is 8, which achieves the lowest MSE and relatively high adjusted $R^2$.
+Using cross-validation with 5 folds, we see the adjusted $R^2$ increases as the degree of freedom increases, and the lowest MSE is achieved at degree of 13. The optimal polynomial degrees of freedom for St is 13, which achieves the lowest MSE and the highest adjusted $R^2$.
 
 ### GAM
 ```{r}
 df.shuffled <- train[sample(nrow(train)),]
-degree <- 20
+df <- 20
 
 #create object to hold MSE's of models
-mse <- matrix(data=NA,nrow=K,ncol=degree)
-adj.r2 <- matrix(data=NA,nrow=K,ncol=degree)
+mse <- matrix(data=NA,nrow=K,ncol=df)
+adj.r2 <- matrix(data=NA,nrow=K,ncol=df)
 
 #Perform K-fold cross validation
 for(i in 1:K){
@@ -182,27 +181,28 @@ for(i in 1:K){
     trainData <- df.shuffled[-testIndexes, ]
     
     #use k-fold cv to evaluate models
-    for (j in 1:degree){
-      # print(paste0(i,j))
-      fit.train <- gam::gam(R_moment_1 ~ s(St, df = j) + Fr + Re + Fr * Re,
-         data = trainData)
-      adj.r2[i,j] <- with(summary(fit.train), 1 - deviance/null.deviance)
-      fit.test <- predict(fit.train, newdata=testData)
-      mse[i,j] <- mean((fit.test-testData$R_moment_1)^2) 
+    for (j in 1:df){
+        fit.train <- gam(R_moment_1 ~ s(St, df = j) + Fr + Re + Fr * Re,
+                              data = trainData)
+        adj.r2[i,j] <- with(summary(fit.train), 1 - deviance/null.deviance)
+        fit.test <- predict(fit.train, newdata=testData)
+        mse[i,j] <- mean((exp(fit.test-testData$R_moment_1))^2) 
     }
 }
+
 
 #find MSE for each degree 
 mean_mse_gam <- colMeans(mse)
 min_mse_gam <- min(mse)
 mean_r2_gam <- colMeans(adj.r2)
 max_r2_gam <- max(adj.r2)
-plot(c(1:degree), mean_mse_gam, xlab = "Degree of Freedom", ylab = "MSE", 
+
+plot(c(1:df), mean_mse_gam, xlab = "Degree of Freedom", ylab = "MSE", 
      type = "l", main = "GAM")
-plot(c(1:degree), mean_r2_gam, xlab = "Degree of Freedom", ylab = "Adjusted R^2",
+plot(c(1:df), mean_r2_gam, xlab = "Degree of Freedom", ylab = "Adjusted R^2",
      type = "l", main = "GAM")
 ```
-Using cross-validation with 5 folds, we see the adjusted $R^2$ increases as the degree of freedom increases. The optimal degree of freedom for GAM model to achieve the lowest MSE is 5. However, we might conculde that a degree of freedom around 14 is optimal because it doesn't have a big increase in MSE compared to degree of freedom at 5. It also achieves the highest adjusted $R^2$.
+Using cross-validation with 5 folds, we see the adjusted $R^2$ increases as the degree of freedom increases to an extent (around 13). The optimal degree of freedom for GAM model to achieve the lowest MSE is also around 13. W might conclude that a degree of freedom around 13 is optimal.
 
 
 ```{r}
@@ -220,9 +220,9 @@ adj.R <- c(mse_adjr2,
            max_r2_ns,
            max_r2_gam)
 formula <- c("R_moment_1 ~ Fr + Re + St + Fr * Re",
-             "R_moment_1 ~ Fr + Re + poly(St, 4) + Fr * Re",
-             "R_moment_1 ~ ns(St, df = 8) + Fr + Re + Fr * Re",
-             "R_moment_1 ~ s(St, 14) + Re + Fr + Fr * Re"
+             "R_moment_1 ~ Fr + Re + poly(St, 2) + Fr * Re",
+             "R_moment_1 ~ ns(St, df = 13) + Fr + Re + Fr * Re",
+             "R_moment_1 ~ s(St, 13) + Re + Fr + Fr * Re"
              )
 df <- data.frame(models, formula, mse, adj.R)
 df %>% 
@@ -231,4 +231,4 @@ df %>%
   add_footnote(c("Fr logit-transformed"), notation = "symbol")
 ```
 
-For prediction: GAM is the best because it has the highest adjusted $R^2$. However, since we cannot intrepret the coefficients of each predictor, we would use polynomial regression for inference.
+Summary: Natural spline has the best results since it presents the highest adjusted $R^2$ and the lowest MSE. The second best model is polynomial regression, with only slight increase in MSE and decrease in adjusted $R^2$. Since natural splines are hard to interpret, we use it for prediction and polynomial regression for inference.
