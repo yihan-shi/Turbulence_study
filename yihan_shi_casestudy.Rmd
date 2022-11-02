@@ -112,10 +112,10 @@ for(i in 1:K){
     
     #use k-fold cv to evaluate models
     for (j in 1:df){
-        fit.train <- lm(R_moment_1 ~ ns(St, df = j) + Fr + Re + Fr * Re,
+        fit.train <- glm(R_moment_1 ~ ns(St, df = j) + Fr + Re + Fr * Re,
            data = trainData)
-        # adj.r2[i,j] <- with(summary(fit.train), 1 - deviance/null.deviance)
-        adj.r2[i,j] <- summary(fit.train)$adj.r.squared
+        adj.r2[i,j] <- with(summary(fit.train), 1 - deviance/null.deviance)
+        # adj.r2[i,j] <- summary(fit.train)$adj.r.squared
         fit.test <- predict(fit.train, newdata=testData)
         mse[i,j] <- mean((exp(fit.test)-testData$R_moment_1)^2) 
     }
@@ -131,7 +131,7 @@ plot(c(1:df), mean_mse_ns, xlab = "Degree of Freedom", ylab = "MSE",
 plot(c(1:df), mean_r2_ns, xlab = "Degree of Freedom", ylab = "Adjusted R^2",
      type = "l", main = "Natural spline")
 ```
-Using cross-validation with 5 folds, we see the adjusted $R^2$ increases as the degree of freedom increases, and the lowest MSE is achieved at degree of 13. The optimal polynomial degrees of freedom for St is 13, which achieves both the highest adjusted $R^2$ and MSE.
+Using cross-validation with 5 folds, we see the adjusted $R^2$ increases as the degree of freedom increases, and the lowest MSE is achieved at degree of 13. The optimal polynomial degrees of freedom for St is 8, which achieves the lowest MSE and relatively high adjusted $R^2$.
 
 ### GAM
 ```{r}
@@ -186,7 +186,7 @@ adj.R <- c(max_r2_linear,
            max_r2_ns,
            max_r2_gam)
 formula <- c("log(R_moment_1) ~ Fr + Re + poly(St, 4) + Fr * Re",
-             "log(R_moment_1) ~ ns(St, df = 13) + Fr + Re + Fr * Re",
+             "log(R_moment_1) ~ ns(St, df = 8) + Fr + Re + Fr * Re",
              "log(R_moment_1) ~ s(St, 14) + Re + Fr + Fr * Re"
              )
 df <- data.frame(models, formula, mse, adj.R)
