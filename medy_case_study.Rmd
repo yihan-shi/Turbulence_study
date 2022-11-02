@@ -697,9 +697,9 @@ adj.R <- c(adjR2_ls,
            adjR2_spline,
            adjR2_gam)
 formula <- c("log(R_moment_4) ~ Fr + Re + St",
-            "log(R_moment_4) ~ Fr + Re + poly(St, 5) + Fr * Re",
-             "log(R_moment_4) ~ ns(St, df = 6) + Fr + Re + Fr * Re",
-             "log(R_moment_4) ~ ns(St, 4) + Re + ns(Fr_logit,2) + Re:ns(Fr_logit,2)"
+            "log(R_moment_4) ~ Fr + Re + poly(St, 2)",
+             "log(R_moment_4) ~ ns(St, df = 4) + Fr + Re",
+             "log(R_moment_4) ~ ns(St, df = 2) + Re + Fr"
              )
 df <- data.frame(models, formula, mse, adj.R)
 df %>% 
