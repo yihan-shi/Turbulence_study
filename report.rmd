@@ -1,0 +1,305 @@
+---
+title: "Repoer"
+author: "Yihan Shi, Medy Mu, Edna Zhang"
+date: "10/31/2022"
+output: pdf_document
+---
+
+# Introduction
+
+"We are experiencing some turbulence, please fasten your seat belt." Many of us might have heard this radio on the plane and felt bumpy. When we mix paint in water, we can also observe turbulence as the color dissipates. Turbulence is so common and easily observed in daily life, yet its causes and effects are hard to predict. In fluid dynamics, turbulence is "characterized by chaotic changes in pressure and flow velocity". With some knowledge and observation in parameters such as fluid density, flow speed, and the property of particles that cluster inside turbulent flows, we can gain insights into the distribution and clustering of particles in idealized turbulence. In this case study, we will investigate 3 observed features that might contribute to particle distribution in turbulence: Reynolds number (Re), which takes flow speed, viscosity, and density into account; Gravitational acceleration (Fr); Stokes number (St) that quantifies particle characteristics like size, relaxation time, and particle diameter. We hope to use these 3 features to explain changes in particle distribution as well as extrapolate beyond the scope of the known observations.
+
+# Model
+
+---
+title: "case study"
+author: "edna zhang"
+output: html_document
+date: "2022-10-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("boot")
+library("glmnet")
+library("gam")
+library("kableExtra")
+```
+
+
+```{r}
+train <- read.csv("data-train.csv")
+test <- read.csv("data-test.csv")
+summary(train)
+```
+
+```{r}
+plot(density(train$St))
+```
+```{r}
+plot(density(log(train$St)))
+```
+
+```{r}
+plot(density(train$R_moment_3))
+```
+
+```{r}
+plot(density(log(train$R_moment_3)))
+```
+```{r}
+train
+```
+```{r}
+train$St_log <- log(train$St)
+```
+
+```{r}
+asymptote <- 25
+scale <- 2
+midpoint <- 0.3
+train$Fr_logit <-  asymptote / (1 + exp((midpoint - train$Fr) * scale))
+```
+```{r}
+train$R_moment_3_log <- log(train$R_moment_3)
+train
+```
+```{r}
+var <- c("St_log", "Re", "Fr_logit", "R_moment_3_log")
+cor <- pairs(train[,(names(train) %in% var)])
+cor
+```
+
+```{r}
+set.seed(1)
+#randomly shuffle data
+df.shuffled <- train[sample(nrow(train)),]
+#define number of folds to use for k-fold cross-validation
+K <- 5
+#create k equal-sized folds
+folds <- cut(seq(1,nrow(df.shuffled)),breaks=K,labels=FALSE)
+#create object to hold MSE's of models
+linear_mse = rep(0,5)
+linear_R2 <- rep(0,5)
+#Perform K-fold cross validation
+for(i in 1:K){
+    
+    #define training and testing data
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    testData <- df.shuffled[testIndexes, ]
+    trainData <- df.shuffled[-testIndexes, ]
+    
+    #use k-fold cv to evaluate models
+    linear = lm(R_moment_3_log~St_log+Re+Fr_logit, data = trainData)
+    fit.test = predict(linear, newdata=testData)
+    linear_mse[i] = mean((exp(fit.test)-testData$R_moment_3)^2) 
+    linear_R2[i] <- summary(linear)$adj.r.squared
+}
+```
+
+```{r}
+summary(linear)
+```
+
+```{r}
+plot(linear)
+```
+
+```{r}
+mse_linear <- mean(linear_mse)
+mse_linear
+R2_linear <- max(linear_R2)
+R2_linear
+```
+
+```{r}
+set.seed(1)
+#randomly shuffle data
+df.shuffled <- train[sample(nrow(train)),]
+#define number of folds to use for k-fold cross-validation
+K <- 5
+#create k equal-sized folds
+folds <- cut(seq(1,nrow(df.shuffled)),breaks=K,labels=FALSE)
+#create object to hold MSE's of models
+interaction_mse = rep(0,5)
+interaction_R2 <- rep(0,5)
+#Perform K-fold cross validation
+for(i in 1:K){
+    
+    #define training and testing data
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    testData <- df.shuffled[testIndexes, ]
+    trainData <- df.shuffled[-testIndexes, ]
+    
+    #use k-fold cv to evaluate models
+    interaction = lm(R_moment_3_log~St_log+Re+Fr_logit+Re*Fr_logit, data = trainData)
+    fit.test = predict(interaction, newdata=testData)
+    interaction_mse[i] = mean((exp(fit.test)-testData$R_moment_3)^2) 
+    interaction_R2[i] <- summary(interaction)$adj.r.squared
+}
+```
+
+```{r}
+summary(interaction)
+```
+
+```{r}
+plot(interaction)
+```
+
+```{r}
+mse_interaction <- mean(interaction_mse)
+mse_interaction
+R2_interaction <- max(interaction_R2)
+R2_interaction
+```
+
+```{r}
+set.seed(1)
+#randomly shuffle data
+df.shuffled <- train[sample(nrow(train)),]
+#define number of folds to use for k-fold cross-validation
+K <- 5
+#create k equal-sized folds
+folds <- cut(seq(1,nrow(df.shuffled)),breaks=K,labels=FALSE)
+#create object to hold MSE's of models
+poly_mse = matrix(data=NA,nrow=K,ncol=10)
+poly_R2 <- matrix(data=NA,nrow=K,ncol=10)
+#Perform K-fold cross validation
+for(i in 1:K){
+    
+    #define training and testing data
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    testData <- df.shuffled[testIndexes, ]
+    trainData <- df.shuffled[-testIndexes, ]
+    
+    #use k-fold cv to evaluate models
+    for (j in 1:10){
+        poly = lm(R_moment_3_log ~ poly(St_log,j)+Re+poly(Fr_logit,2)+Re*Fr_logit, data = trainData)
+        fit.test = predict(poly, newdata=testData)
+        poly_mse[i,j] = mean((exp(fit.test)-testData$R_moment_3)^2) 
+        poly_R2[i,j] <- summary(poly)$adj.r.squared
+    }
+}
+```
+
+```{r}
+colMeans(poly_mse)
+colMeans(poly_R2)
+min(colMeans(poly_mse))
+max(colMeans(poly_R2))
+```
+
+```{r}
+poly <- lm(R_moment_3_log ~ poly(St_log,3)+Re+poly(Fr_logit,2)+Re*poly(Fr_logit,2), data = train)
+```
+
+```{r}
+summary(poly)
+```
+
+```{r}
+plot(poly)
+```
+
+```{r}
+mse_poly <- colMeans(poly_mse)[3]
+mse_poly
+R2_poly <- colMeans(poly_R2)[3]
+R2_poly
+```
+
+```{r}
+length(unique(train$St))
+```
+
+```{r}
+RSS <- rep(0,13)
+for (i in 3:13) {
+  spline <- glm(log(R_moment_2) ~ bs(St, df = i) + Re + Fr_logit + Re*Fr_logit, data = train)
+  RSS[i] <- sum(spline$residuals^2)
+}
+plot(3:13, RSS[3:13], type="b", xlab="Degrees of freedom", ylab = "RSS")
+title("RSS vs. Degrees of freedom")
+```
+```{r}
+set.seed(1)
+#randomly shuffle data
+df.shuffled <- train[sample(nrow(train)),]
+#define number of folds to use for k-fold cross-validation
+K <- 5
+#create k equal-sized folds
+folds <- cut(seq(1,nrow(df.shuffled)),breaks=K,labels=FALSE)
+#create object to hold MSE's of models
+spline_mse = matrix(data=NA,nrow=K,ncol=13)
+spline_R2 <- matrix(data=NA,nrow=K,ncol=13)
+#Perform K-fold cross validation
+for(i in 1:K){
+    
+    #define training and testing data
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    testData <- df.shuffled[testIndexes, ]
+    trainData <- df.shuffled[-testIndexes, ]
+    
+    #use k-fold cv to evaluate models
+    for (j in 3:13){
+        spline = glm(R_moment_3_log ~ ns(St_log, df = j)+Re+poly(Fr_logit,2)+Re*Fr_logit, data = trainData)
+        fit.test = predict(spline, newdata=testData)
+        spline_mse[i,j] = mean((exp(fit.test)-testData$R_moment_3)^2) 
+        spline_R2[i,j] <- with(summary(spline), 1 - deviance/null.deviance)
+    }
+}
+```
+
+```{r}
+colMeans(spline_mse)
+colMeans(spline_R2)
+min(colMeans(spline_mse), na.rm=TRUE)
+max(colMeans(spline_R2), na.rm=TRUE)
+```
+
+```{r}
+spline <- glm(R_moment_3_log ~ ns(St_log, df = 3)+Re+poly(Fr_logit,2)+Re*Fr_logit, data = trainData)
+summary(spline)
+```
+
+```{r}
+plot(spline)
+```
+
+```{r}
+mse_spline <- colMeans(spline_mse)[3]
+mse_spline
+R2_spline <- colMeans(spline_R2)[3]
+R2_spline
+```
+
+```{r}
+# make a MSE table
+models <- c("Least square regression",
+            "Interaction", 
+            "Polynomial regression", 
+            "Natural spline")
+mse <- c(mse_linear, 
+         mse_interaction, 
+         mse_poly,
+         mse_spline)
+R2 <- c(R2_linear,
+        R2_interaction, 
+        R2_poly,
+        R2_spline)
+formula <- c("log(R_moment_3) ~ log(St)+Re+logit(Fr)",
+            "log(R_moment_3) ~ log(St)+Re+logit(Fr)+Re*logit(Fr)",
+             "log(R_moment_3) ~ poly(log(St),3)+Re+poly(logit(Fr),2)+Re*logit(Fr)",
+             "log(R_moment_3) ~ ns(log(St),df=3)+Re+poly(logit(Fr),2)+Re*logit(Fr)"
+             )
+df <- data.frame(models, formula, mse, R2)
+df %>% 
+  kbl() %>% 
+  kable_styling()
+```
+
+
