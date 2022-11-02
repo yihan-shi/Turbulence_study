@@ -5,23 +5,28 @@ date: "10/31/2022"
 output: pdf_document
 ---
 
-# Introduction
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
 
-"We are experiencing some turbulence, please fasten your seat belt." Many of us might have heard this radio on the plane and felt bumpy. When we mix paint in water, we can also observe turbulence as the color dissipates. Turbulence is so common and easily observed in daily life, yet its causes and effects are hard to predict. In fluid dynamics, turbulence is "characterized by chaotic changes in pressure and flow velocity". With some knowledge and observation in parameters such as fluid density, flow speed, and the property of particles that cluster inside turbulent flows, we can gain insights into the distribution and clustering of particles in idealized turbulence. In this case study, we will investigate 3 observed features that might contribute to particle distribution in turbulence: Reynolds number (Re), which takes flow speed, viscosity, and density into account; Gravitational acceleration (Fr); Stokes number (St) that quantifies particle characteristics like size, relaxation time, and particle diameter. We hope to use these 3 features to explain changes in particle distribution as well as extrapolate beyond the scope of the known observations.
-
-# Model
-
-## Raw Moment 1
-
-
-## Raw Moment 2
+```{r}
+library(tidyverse)
+library(plyr)
+library(gam)
+library(boot)
+library(splines)
+library(kableExtra)
+library(glmnet)
+```
 
 ```{r}
 train <- read.csv("data-train.csv")
 test <- read.csv("data-test.csv")
+set.seed(1)
 ```
 
 ```{r}
+# transformation
 asymptote <- 25
 scale <- 2
 midpoint <- 0.3
@@ -36,6 +41,213 @@ train$C_moment_2 <- train$R_moment_2 - (train$R_moment_1)^2
 train$C_moment_3 <- train$R_moment_3 - 3*train$R_moment_1*train$R_moment_2 + 2*(train$R_moment_1)^3
 train$C_moment_4 <- train$R_moment_4 - 4*train$R_moment_1*train$R_moment_3 + 6*(train$R_moment_1)^2*train$R_moment_2 -3*(train$R_moment_1)^4
 ```
+
+# Introduction
+
+"We are experiencing some turbulence, please fasten your seat belt." Many of us might have heard this radio on the plane and felt bumpy. When we mix paint in water, we can also observe turbulence as the color dissipates. Turbulence is so common and easily observed in daily life, yet its causes and effects are hard to predict. In fluid dynamics, turbulence is "characterized by chaotic changes in pressure and flow velocity". With some knowledge and observation in parameters such as fluid density, flow speed, and the property of particles that cluster inside turbulent flows, we can gain insights into the distribution and clustering of particles in idealized turbulence. In this case study, we will investigate 3 observed features that might contribute to particle distribution in turbulence: Reynolds number (Re), which takes flow speed, viscosity, and density into account; Gravitational acceleration (Fr); Stokes number (St) that quantifies particle characteristics like size, relaxation time, and particle diameter. We hope to use these 3 features to explain changes in particle distribution as well as extrapolate beyond the scope of the known observations.
+
+# Model
+
+## Raw Moment 1
+```{r}
+plot(density(train$R_moment_1))
+plot(density(log(train$R_moment_1)))
+```
+
+Since R_moment_1 is skewed, we do a log transformation to make it more normal.
+
+### Linear regression
+```{r}
+df.shuffled <- train[sample(nrow(train)),]
+K <- 5
+
+#create k equal-sized folds
+folds <- cut(seq(1,nrow(df.shuffled)), breaks=K, labels=FALSE)
+
+#create object to hold MSE's of models
+mse <- rep(NA, K)
+adj.r2 <- rep(NA, K)
+
+#Perform K-fold cross validation
+for(i in 1:K){
+    
+    #define training and testing data
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    testData <- df.shuffled[testIndexes, ]
+    trainData <- df.shuffled[-testIndexes, ]
+    
+    #use k-fold cv to evaluate models
+    fit.train <-  lm(log(R_moment_1) ~ St + Re + Fr_logit + Re*Fr_logit, data = trainData)
+    fit.test <- predict(fit.train, newdata=testData)
+    mse[i] <- mean((exp(fit.test-testData$R_moment_1))^2) 
+    adj.r2[i] <- summary(fit.train)$adj.r.squared
+}
+
+#find MSE
+mse_linear <- mean(mse)
+mse_adjr2 <- mean(adj.r2)
+```
+
+### Polynomial regression
+```{r}
+#define number of folds to use for k-fold cross-validation
+K <- 5
+
+#define degree of polynomials to fit
+degree <- 10
+
+#create k equal-sized folds
+folds <- cut(seq(1,nrow(df.shuffled)),breaks=K,labels=FALSE)
+
+#create object to hold MSE's of models
+mse = matrix(data=NA,nrow=K,ncol=degree)
+adj.r2 <- matrix(data=NA,nrow=K,ncol=degree)
+
+#Perform K-fold cross validation
+for(i in 1:K){
+    
+    #define training and testing data
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    testData <- df.shuffled[testIndexes, ]
+    trainData <- df.shuffled[-testIndexes, ]
+    
+    #use k-fold cv to evaluate models
+    for (j in 1:degree){
+        fit.train = lm(log(R_moment_1) ~ poly(St,j) + Re + Fr_logit + Re*Fr_logit, data = trainData)
+        fit.test <- predict(fit.train, newdata=testData)
+        mse[i,j] <- mean((exp(fit.test-testData$R_moment_1))^2) 
+        adj.r2[i,j] <- summary(fit.train)$adj.r.squared
+    }
+}
+
+x <- 1:10
+mean_mse_linear <- colMeans(mse)
+min_mse_linear <- min(mse)
+mean_r2_linear <- colMeans(adj.r2)
+max_r2_linear <- max(adj.r2)
+
+plot(x, mean_mse_linear, type = "l", xlab = "Polynomial Degree", ylab = "MSE", main = "Polynomial regression")
+plot(c(1:10), mean_r2_linear, xlab = "Polynomial Degree", ylab = "Adjusted R^2", main = "Polynomial regression", type = "l")
+```
+
+Using cross-validation with 5 folds, we see the adjusted $R^2$ decreases as polynomial degree increases. The MSE indicates that linear regression is no sufficient. The minimum MSE is achieved with polynomial order 2 on St. We decided that the optimal polynomial order for St is 2 for better interpretation.
+
+We tried removing data of both high leverage and residual. However, this didn't change the MSE and adjusted $R^2$ greatly. Since these observations take up 7% of the full training data, we decided that we don't want to exclude them.
+
+### Natural spline
+```{r}
+df <- 13
+
+#create object to hold MSE's of models
+mse <- matrix(data=NA,nrow=K,ncol=df)
+adj.r2 <- matrix(data=NA,nrow=K,ncol=df)
+
+#Perform K-fold cross validation
+for(i in 1:K){
+    
+    #define training and testing data
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    testData <- df.shuffled[testIndexes, ]
+    trainData <- df.shuffled[-testIndexes, ]
+    
+    #use k-fold cv to evaluate models
+    for (j in 1:df){
+        fit.train <- glm(log(R_moment_1) ~ ns(St, df = j) + Fr_logit + Re + Fr_logit * Re,
+           data = trainData)
+        adj.r2[i,j] <- with(summary(fit.train), 1 - deviance/null.deviance)
+        # adj.r2[i,j] <- summary(fit.train)$adj.r.squared
+        fit.test <- predict(fit.train, newdata=testData)
+        mse[i,j] <- mean((exp(fit.test-testData$R_moment_1))^2) 
+    }
+}
+
+#find MSE for each degree 
+mean_mse_ns <- colMeans(mse)
+min_mse_ns <- min(mse)
+mean_r2_ns <- colMeans(adj.r2)
+max_r2_ns <- max(adj.r2)
+
+plot(c(1:df), mean_mse_ns, xlab = "Degree of Freedom", ylab = "MSE", 
+     type = "l", main = "Natural spline")
+plot(c(1:df), mean_r2_ns, xlab = "Degree of Freedom", ylab = "Adjusted R^2",
+     type = "l", main = "Natural spline")
+```
+
+Using cross-validation with 5 folds, we see the adjusted $R^2$ increases as the degree of freedom increases, and the lowest MSE is achieved at degree of 7. The optimal polynomial degrees of freedom for St is 7, which achieves the lowest MSE and a decent adjusted $R^2$.
+
+### GAM
+```{r}
+df <- 20
+
+#create object to hold MSE's of models
+mse <- matrix(data=NA,nrow=K,ncol=df)
+adj.r2 <- matrix(data=NA,nrow=K,ncol=df)
+
+#Perform K-fold cross validation
+for(i in 1:K){
+    
+    #define training and testing data
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    testData <- df.shuffled[testIndexes, ]
+    trainData <- df.shuffled[-testIndexes, ]
+    
+    #use k-fold cv to evaluate models
+    for (j in 1:df){
+        fit.train <- gam(log(R_moment_1) ~ s(St, df = j) + Fr_logit + Re + Fr_logit * Re,
+                              data = trainData)
+        adj.r2[i,j] <- with(summary(fit.train), 1 - deviance/null.deviance)
+        fit.test <- predict(fit.train, newdata=testData)
+        mse[i,j] <- mean((exp(fit.test-testData$R_moment_1))^2) 
+    }
+}
+
+
+#find MSE for each degree 
+mean_mse_gam <- colMeans(mse)
+min_mse_gam <- min(mse)
+mean_r2_gam <- colMeans(adj.r2)
+max_r2_gam <- max(adj.r2)
+
+plot(c(1:df), mean_mse_gam, xlab = "Degree of Freedom", ylab = "MSE", 
+     type = "l", main = "GAM")
+plot(c(1:df), mean_r2_gam, xlab = "Degree of Freedom", ylab = "Adjusted R^2",
+     type = "l", main = "GAM")
+```
+
+Using cross-validation with 5 folds, we see the adjusted $R^2$ increases as the degree of freedom increases to an extent (around 13). The optimal degrees of freedom for GAM model to achieve the lowest MSE is around 5, but MSE stops increasing after lifting degrees of freedom to 13. For more prediction power, we conclude that a degree of freedom around 13 is optimal.
+
+```{r}
+# make a MSE table
+models <- c("Linear regresion", 
+            "Polynomial regression", 
+            "Natural spline", 
+            "Generalized additive model")
+mse <- c(mse_linear,
+         min_mse_linear, 
+         min_mse_ns, 
+         min_mse_gam)
+adj.R <- c(mse_adjr2,
+           max_r2_linear,
+           max_r2_ns,
+           max_r2_gam)
+formula <- c("R_moment_1 ~ Fr + Re + St + Fr * Re",
+             "R_moment_1 ~ Fr + Re + poly(St, 2) + Fr * Re",
+             "R_moment_1 ~ ns(St, df = 13) + Fr + Re + Fr * Re",
+             "R_moment_1 ~ s(St, 13) + Re + Fr + Fr * Re"
+             )
+df <- data.frame(models, formula, mse, adj.R)
+df %>% 
+  kable(caption = "Model MSE and Adjusted $R^2$") %>% 
+  kable_styling() %>% 
+  add_footnote(c("Fr logit-transformed"), notation = "symbol")
+```
+
+
+Summary: For Raw_moment_1 (mean), GAM has the best results since it presents the highest adjusted $R^2$ and the lowest MSE. The second best model is natural spline, with only slight increase in MSE and decrease in adjusted $R^2$. Since both are hard to interpret, we use it for prediction and polynomial regression for inference.
+
+
+
+## Raw Moment 2
 
 ```{r}
 plot(density(train$R_moment_2))
@@ -66,10 +278,6 @@ summary(r2_ls_int)
 ```
 
 ```{r}
-set.seed(1)
-#randomly shuffle data
-df.shuffled <- train[sample(nrow(train)),]
-
 #define number of folds to use for k-fold cross-validation
 K <- 5
 
@@ -122,10 +330,6 @@ plot(r2_ls_int)
 ### Polynomial Model
 
 ```{r}
-set.seed(1)
-#randomly shuffle data
-df.shuffled <- train[sample(nrow(train)),]
-
 #define number of folds to use for k-fold cross-validation
 K <- 5
 
@@ -186,9 +390,6 @@ title("RSS vs. Degrees of freedom")
 ```
 
 ```{r}
-#randomly shuffle data
-df.shuffled <- train[sample(nrow(train)),]
-
 #define number of folds to use for k-fold cross-validation
 K <- 5
 
@@ -251,10 +452,6 @@ plot(r2_spline)
 ### Generalized Additive Model
 
 ```{r}
-set.seed(1)
-#randomly shuffle data
-df.shuffled <- train[sample(nrow(train)),]
-
 #define number of folds to use for k-fold cross-validation
 K <- 10 
 
@@ -379,9 +576,6 @@ cor
 ## Least Square Regression
 
 ```{r}
-set.seed(1)
-#randomly shuffle data
-df.shuffled <- train[sample(nrow(train)),]
 #define number of folds to use for k-fold cross-validation
 K <- 5
 #create k equal-sized folds
@@ -423,9 +617,6 @@ R2_linear
 ### Least Square Regression with Interactions
 
 ```{r}
-set.seed(1)
-#randomly shuffle data
-df.shuffled <- train[sample(nrow(train)),]
 #define number of folds to use for k-fold cross-validation
 K <- 5
 #create k equal-sized folds
@@ -467,9 +658,6 @@ R2_interaction
 ### Polynomial Model
 
 ```{r}
-set.seed(1)
-#randomly shuffle data
-df.shuffled <- train[sample(nrow(train)),]
 #define number of folds to use for k-fold cross-validation
 K <- 5
 #create k equal-sized folds
@@ -536,10 +724,8 @@ for (i in 3:13) {
 plot(3:13, RSS[3:13], type="b", xlab="Degrees of freedom", ylab = "RSS")
 title("RSS vs. Degrees of freedom")
 ```
+
 ```{r}
-set.seed(1)
-#randomly shuffle data
-df.shuffled <- train[sample(nrow(train)),]
 #define number of folds to use for k-fold cross-validation
 K <- 5
 #create k equal-sized folds
@@ -639,10 +825,6 @@ summary(r4_ls_int)
 ```
 
 ```{r}
-set.seed(1)
-#randomly shuffle data
-df.shuffled <- train[sample(nrow(train)),]
-
 #define number of folds to use for k-fold cross-validation
 K <- 5
 
@@ -700,10 +882,6 @@ plot(r4_ls_int)
 ### Polynomial Model
 
 ```{r}
-set.seed(1)
-#randomly shuffle data
-df.shuffled <- train[sample(nrow(train)),]
-
 #define number of folds to use for k-fold cross-validation
 K <- 5
 
@@ -775,9 +953,6 @@ title("RSS vs. Degrees of freedom")
 ```
 
 ```{r}
-#randomly shuffle data
-df.shuffled <- train[sample(nrow(train)),]
-
 #define number of folds to use for k-fold cross-validation
 K <- 5
 
@@ -812,6 +987,7 @@ for(i in 1:K){
 #find MSE for each degree 
 colMeans(mse)
 ```
+
 ```{r}
 mse_spline<- min(colMeans(mse)[4:15])
 mse_spline
@@ -840,10 +1016,6 @@ plot(r4_spline)
 ### Generalized Additive Model
 
 ```{r}
-set.seed(1)
-#randomly shuffle data
-df.shuffled <- train[sample(nrow(train)),]
-
 #define number of folds to use for k-fold cross-validation
 K <- 10 
 
