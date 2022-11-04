@@ -45,15 +45,15 @@ train$C_moment_4 <- train$R_moment_4 - 4*train$R_moment_1*train$R_moment_3 + 6*(
 ```
 
 ```{r}
-plot(density(train$R_moment_2))
-plot(density(log(train$R_moment_2)))
+plot(density(train$C_moment_2))
+plot(density(log(train$C_moment_2)))
 
 plot(density(train$St))
 
 plot(density(train$Re))
 
-plot(train$St, log(train$R_moment_2), type = "b")
-plot(train$Re, log(train$R_moment_2), type = "b")
+plot(train$St, log(train$C_moment_2), type = "b")
+plot(train$Re, log(train$C_moment_2), type = "b")
 ```
 
 ```{r}
@@ -64,10 +64,10 @@ cor
 
 ```{r}
 # least square model
-r2_ls <- lm(log(R_moment_2) ~ St + Re + Fr_logit, data = train)
-r2_ls_int <- lm(log(R_moment_2) ~ St + Re + Fr_logit + Re*Fr_logit, data = train)
-summary(r2_ls)
-summary(r2_ls_int)
+c2_ls <- lm(log(C_moment_2) ~ St + Re + Fr_logit, data = train)
+c2_ls_int <- lm(log(C_moment_2) ~ St + Re + Fr_logit + Re*Fr_logit, data = train)
+summary(c2_ls)
+summary(c2_ls_int)
 ```
 
 ```{r}
@@ -94,9 +94,9 @@ for(i in 1:K){
     trainData <- df.shuffled[-testIndexes, ]
     
     #use k-fold cv to evaluate models
-    fit.train = lm(log(R_moment_2) ~ St + Re + Fr_logit + Re*Fr_logit, data = trainData)
+    fit.train = lm(log(C_moment_2) ~ St + Re + Fr_logit + Re*Fr_logit, data = trainData)
     fit.test = predict(fit.train, newdata=testData)
-    mse[i] = mean((exp(fit.test)-testData$R_moment_2)^2) 
+    mse[i] = mean((exp(fit.test)-testData$C_moment_2)^2) 
     adj.r2[i] <- summary(fit.train)$adj.r.squared
     
 }
@@ -122,11 +122,11 @@ adjR2_ls
 
 ```{r}
 par(mfrow=c(2,2))
-plot(r2_ls)
+plot(c2_ls)
 ```
 ```{r}
 par(mfrow=c(2,2))
-plot(r2_ls_int)
+plot(c2_ls_int)
 ```
 
 ```{r}
@@ -157,9 +157,9 @@ for(i in 1:K){
     
     #use k-fold cv to evaluate models
     for (j in 1:degree){
-        fit.train = lm(log(R_moment_2) ~ poly(St,j) + Re + poly(Fr_logit,2) + Re*Fr_logit, data = trainData)
+        fit.train = lm(log(C_moment_2) ~ poly(St,j) + Re + poly(Fr_logit,2) + Re*Fr_logit, data = trainData)
         fit.test = predict(fit.train, newdata=testData)
-        mse[i,j] = mean((exp(fit.test)-testData$R_moment_2)^2) 
+        mse[i,j] = mean((exp(fit.test)-testData$C_moment_2)^2) 
         adj.r2[i,j] <- summary(fit.train)$adj.r.squared
     }
 }
@@ -167,23 +167,21 @@ for(i in 1:K){
 #find MSE for each degree 
 colMeans(mse)
 ```
-```{r}
-adj.r2
-```
 
 
 ```{r}
 mse_poly<- min(colMeans(mse))
 mse_poly
 
-adjR2_poly <- max(adj.r2[,5])
+adjR2_poly <- max(adj.r2[,2])
 adjR2_poly
 ```
 
 ```{r}
-r2_poly <- lm(log(R_moment_2) ~ poly(St,5) + Re + poly(Fr_logit,2) + Re*Fr_logit, data = train)
+c2_poly <- lm(log(C_moment_2) ~ poly(St,2) + Re + poly(Fr_logit,2) + Re*Fr_logit, data = train)
 summary(r2_poly)
 ```
+
 ```{r}
 #poly_pred <- predict(r2_poly, newdata=sub_test)
 #mean((exp(poly_pred)-sub_test$R_moment_2)^2) 
@@ -193,10 +191,11 @@ summary(r2_poly)
 ## Non linear modeling
 
 ### Natural spline
+
 ```{r}
 RSS <- rep(0,15)
 for (i in 4:15) {
-model.fit <- glm(log(R_moment_2) ~ ns(St, df = i) + Re + Fr_logit + Re*Fr_logit, data = train)
+model.fit <- glm(log(C_moment_2) ~ ns(St, df = i) + Re + Fr_logit + Re*Fr_logit, data = train)
 RSS[i] <- sum(model.fit$residuals^2)
 }
 
@@ -231,11 +230,11 @@ for(i in 1:K){
     
     #use k-fold cv to evaluate models
     for (j in 4:degree){
-        fit.train =  glm(log(R_moment_2) ~ ns(St, df = j) + Re + Fr_logit + Re*Fr_logit, data = trainData)
+        fit.train =  glm(log(C_moment_2) ~ ns(St, df = j) + Re + Fr_logit + Re*Fr_logit, data = trainData)
         adj.r2[i,j] <- with(summary(fit.train), 1 - deviance/null.deviance)
         
         fit.test = predict(fit.train, newdata=testData)
-        mse[i,j] = mean((exp(fit.test)-testData$R_moment_2)^2) 
+        mse[i,j] = mean((exp(fit.test)-testData$C_moment_2)^2) 
     }
 }
 
@@ -269,14 +268,14 @@ plot(4:15, colMeans(mse)[4:15], type="b", xlab="Degrees of freedom", ylab="Cross
 
 
 ```{r}
-r2_spline <- glm(log(R_moment_2) ~ ns(St, df = 6) + Re + Fr_logit + Re*Fr_logit, data = train)
+c2_spline <- glm(log(C_moment_2) ~ ns(St, df = 6) + Re + Fr_logit + Re*Fr_logit, data = train)
 attr(ns(train$St, df = 6), "knots")
-summary(r2_spline)
+summary(c2_spline)
 ```
 
 ```{r}
 par(mfrow = c(2,2))
-plot(r2_spline)
+plot(c2_spline)
 ```
 
 ```{r}
@@ -291,7 +290,7 @@ set.seed(1)
 df.shuffled <- train[sample(nrow(train)),]
 
 #define number of folds to use for k-fold cross-validation
-K <- 10 
+K <- 10
 
 #define degree of polynomials to fit
 degree <- 15
@@ -313,10 +312,10 @@ for(i in 1:K){
     
     #use k-fold cv to evaluate models
     for (j in 1:degree){
-        fit.train = gam(log(R_moment_2) ~ ns(St, j) + Re + ns(Fr_logit,2) + Re:ns(Fr_logit,2), data = trainData)
+        fit.train = gam(log(C_moment_2) ~ ns(St, j) + Re + ns(Fr_logit,2) + Re:ns(Fr_logit,2), data = trainData)
         adj.r2[i,j] <- with(summary(fit.train), 1 - deviance/null.deviance)
         fit.test = predict(fit.train, newdata=testData)
-        mse[i,j] = mean((exp(fit.test)-testData$R_moment_2)^2) 
+        mse[i,j] = mean((exp(fit.test)-testData$C_moment_2)^2) 
     }
 }
 
@@ -333,20 +332,15 @@ adjR2_gam
 ```
 
 ```{r}
-r2_gam <- gam(log(R_moment_2) ~ ns(St, df = 4) + Re + ns(Fr_logit, df = 2) + Re:ns(Fr_logit,2), data = train)
+c2_gam <- gam(log(R_moment_2) ~ ns(St, df = 4) + Re + ns(Fr_logit, df = 2) + Re:ns(Fr_logit,2), data = train)
 ```
 
 ```{r}
 par(mfrow = c(1,3))
-plot(r2_gam, se = TRUE, col = "blue")
+plot(c2_gam, se = TRUE, col = "blue")
 ```
 
 
-
-```{r}
-#gam_pred <- predict(r2_gam, newdata = sub_test)
-#mean((sub_test$R_moment_2 - exp(gam_pred))^2)
-```
 
 ```{r}
 # make a MSE table
@@ -362,10 +356,10 @@ adj.R <- c(adjR2_ls,
            adjR2_poly,
            adjR2_spline,
            adjR2_gam)
-formula <- c("log(R_moment_2) ~ Fr + Re + St + Fr * Re",
-            "log(R_moment_2) ~ poly(Fr,2) + Re + poly(St, 5) + Fr * Re",
-             "log(R_moment_2) ~ ns(St, df = 6) + Fr + Re + Fr * Re",
-             "log(R_moment_2) ~ ns(St, 4) + Re + ns(Fr_logit,2) + Re:ns(Fr_logit,2)"
+formula <- c("log(C_moment_2) ~ Fr + Re + St + Fr * Re",
+            "log(C_moment_2) ~ poly(Fr,2) + Re + poly(St, 2) + Fr * Re",
+             "log(C_moment_2) ~ ns(St, df = 6) + Fr + Re + Fr * Re",
+             "log(C_moment_2) ~ ns(St, 4) + Re + ns(Fr_logit,2) + Re:ns(Fr_logit,2)"
              )
 df <- data.frame(models, formula, mse, adj.R)
 df %>% 
@@ -373,28 +367,28 @@ df %>%
   kable_styling()
 ```
 
-## R_moment_4
+## C_moment_4
 
 ```{r}
-plot(density(train$R_moment_4))
-plot(density(log(train$R_moment_4)))
+plot(density(train$C_moment_4))
+plot(density(log(train$C_moment_4)))
 
 plot(density(train$St))
 
 plot(density(train$Re))
 
-plot(train$St, log(train$R_moment_4), type = "b")
-plot(train$Re, log(train$R_moment_4), type = "b")
+plot(train$St, log(train$C_moment_4), type = "b")
+plot(train$Re, log(train$C_moment_4), type = "b")
 ```
 
 
 
 ```{r}
 # least square model
-r4_ls <- lm(log(R_moment_4) ~ St + Re + Fr_logit, data = train)
-r4_ls_int <- lm(log(R_moment_4) ~ St + Re + Fr_logit + Re*Fr_logit, data = train)
-summary(r4_ls)
-summary(r4_ls_int)
+c4_ls <- lm(log(C_moment_4) ~ St + Re + Fr_logit, data = train)
+c4_ls_int <- lm(log(C_moment_4) ~ St + Re + Fr_logit + Re*Fr_logit, data = train)
+summary(c4_ls)
+summary(c4_ls_int)
 ```
 
 ```{r}
@@ -421,9 +415,9 @@ for(i in 1:K){
     trainData <- df.shuffled[-testIndexes, ]
     
     #use k-fold cv to evaluate models
-    fit.train = lm(log(R_moment_4) ~ St + Re + Fr_logit , data = trainData)
+    fit.train = lm(log(C_moment_4) ~ St + Re + Fr_logit + Re*Fr_logit, data = trainData)
     fit.test = predict(fit.train, newdata=testData)
-    mse[i] = mean((exp(fit.test)-testData$R_moment_4)^2) 
+    mse[i] = mean((exp(fit.test)-testData$C_moment_4)^2) 
     adj.r2[i] <- summary(fit.train)$adj.r.squared
     
 }
@@ -448,12 +442,12 @@ adjR2_ls
 
 ```{r}
 par(mfrow=c(2,2))
-plot(r4_ls)
+plot(c4_ls)
 ```
 
 ```{r}
 par(mfrow=c(2,2))
-plot(r4_ls_int)
+plot(c4_ls_int)
 ```
 
 ```{r}
@@ -484,9 +478,9 @@ for(i in 1:K){
     
     #use k-fold cv to evaluate models
     for (j in 1:degree){
-        fit.train = lm(log(R_moment_4) ~ poly(St,j) + Re + Fr_logit, data = trainData)
+        fit.train = lm(log(C_moment_4) ~ poly(St,j) + Re + poly(Fr_logit,2) + Re*Fr_logit, data = trainData)
         fit.test = predict(fit.train, newdata=testData)
-        mse[i,j] = mean((exp(fit.test)-testData$R_moment_4)^2) 
+        mse[i,j] = mean((exp(fit.test)-testData$C_moment_4)^2) 
         adj.r2[i,j] <- summary(fit.train)$adj.r.squared
     }
 }
@@ -494,10 +488,6 @@ for(i in 1:K){
 #find MSE for each degree 
 colMeans(mse)
 ```
-```{r}
-adj.r2
-```
-
 
 ```{r}
 mse_poly<- min(colMeans(mse))
@@ -509,16 +499,9 @@ adjR2_poly
 
 
 ```{r}
-r4_poly <- lm(log(R_moment_4) ~ poly(St,2) + Re + Fr_logit, data = train)
-summary(r4_poly)
+c4_poly <- lm(log(R_moment_4) ~ poly(St,2) + Re + poly(Fr_logit,2) + Re*Fr_logit, data = train)
+summary(c4_poly)
 ```
-
-
-```{r}
-#poly_pred <- predict(r2_poly, newdata=sub_test)
-#mean((exp(poly_pred)-sub_test$R_moment_2)^2) 
-```
-
 
 ## Non linear modeling
 
@@ -526,7 +509,7 @@ summary(r4_poly)
 ```{r}
 RSS <- rep(0,15)
 for (i in 4:15) {
-model.fit <- glm(log(R_moment_4) ~ ns(St, df = i) + Re + Fr_logit + Re*Fr_logit, data = train)
+model.fit <- glm(log(C_moment_4) ~ ns(St, df = i) + Re + Fr_logit + Re*Fr_logit, data = train)
 RSS[i] <- sum(model.fit$residuals^2)
 }
 
@@ -561,11 +544,11 @@ for(i in 1:K){
     
     #use k-fold cv to evaluate models
     for (j in 4:degree){
-        fit.train =  glm(log(R_moment_4) ~ ns(St, df = j) + Re + Fr_logit, data = trainData)
+        fit.train =  glm(log(C_moment_4) ~ ns(St, df = j) + Re + Fr_logit + Re*Fr_logit, data = trainData)
         adj.r2[i,j] <- with(summary(fit.train), 1 - deviance/null.deviance)
         
         fit.test = predict(fit.train, newdata=testData)
-        mse[i,j] = mean((exp(fit.test)-testData$R_moment_4)^2) 
+        mse[i,j] = mean((exp(fit.test)-testData$C_moment_4)^2) 
     }
 }
 
@@ -587,28 +570,15 @@ plot(4:15, colMeans(mse)[4:15], type="b", xlab="Degrees of freedom", ylab="Cross
 ```
 
 
-
 ```{r}
-#set.seed(1)
-#cv.err <- rep(0,15)
-#for (i in 4:15) {
-#model.fit <- glm(log(R_moment_2) ~ ns(St, df = i) + Re + Fr_logit + Re*Fr_logit, data = train)
-#cv.err[i] <- cv.glm(train, model.fit, K=5)$delta[1]
-#}
-
-#plot(4:15, cv.err[4:15], type="b", xlab="Degrees of freedom", ylab="Cross validation error")
-```
-
-
-```{r}
-r4_spline <- glm(log(R_moment_4) ~ ns(St, df = 4) + Re + Fr_logit, data = train)
+c4_spline <- glm(log(C_moment_4) ~ ns(St, df = 6) + Re + Fr_logit + Re*Fr_logit, data = train)
 attr(ns(train$St, df = 4), "knots")
-summary(r4_spline)
+summary(c4_spline)
 ```
 
 ```{r}
 par(mfrow = c(2,2))
-plot(r4_spline)
+plot(c4_spline)
 ```
 
 ```{r}
@@ -645,10 +615,10 @@ for(i in 1:K){
     
     #use k-fold cv to evaluate models
     for (j in 1:degree){
-        fit.train = gam(log(R_moment_4) ~ ns(St, j) + Re + Fr_logit, data = trainData)
+        fit.train = gam(log(C_moment_4) ~ ns(St, j) + Re + ns(Fr_logit,2) + Re:ns(Fr_logit,2), data = trainData)
         adj.r2[i,j] <- with(summary(fit.train), 1 - deviance/null.deviance)
         fit.test = predict(fit.train, newdata=testData)
-        mse[i,j] = mean((exp(fit.test)-testData$R_moment_4)^2) 
+        mse[i,j] = mean((exp(fit.test)-testData$C_moment_4)^2) 
     }
 }
 
@@ -666,12 +636,12 @@ adjR2_gam
 
 
 ```{r}
-r4_gam <- gam(log(R_moment_2) ~ ns(St, df = 2) + Re + Fr_logit, data = train)
+c4_gam <- gam(log(C_moment_2) ~ St + Re + ns(Fr_logit,2) + Re:ns(Fr_logit,2), data = train)
 ```
 
 ```{r}
 par(mfrow = c(1,3))
-plot(r4_gam, se = TRUE, col = "blue")
+plot(c4_gam, se = TRUE, col = "blue")
 ```
 
 
@@ -696,23 +666,13 @@ adj.R <- c(adjR2_ls,
            adjR2_poly,
            adjR2_spline,
            adjR2_gam)
-formula <- c("log(R_moment_4) ~ Fr + Re + St",
-            "log(R_moment_4) ~ Fr + Re + poly(St, 2)",
-             "log(R_moment_4) ~ ns(St, df = 4) + Fr + Re",
-             "log(R_moment_4) ~ ns(St, df = 2) + Re + Fr"
+formula <- c("log(C_moment_4) ~ Fr + Re + St + Fr * Re",
+            "log(C_moment_4) ~ poly(Fr,2) + Re + poly(St, 2) + Fr * Re",
+             "log(C_moment_4) ~ ns(St, df = 6) + Fr + Re + Fr * Re",
+             "log(C_moment_4) ~ St + Re + ns(Fr_logit,2) + Re:ns(Fr_logit,2)"
              )
 df <- data.frame(models, formula, mse, adj.R)
 df %>% 
   kbl() %>% 
   kable_styling()
 ```
-
-
-– How does each of the three parameters (Re, Fr, St) affect the distribution of particle cluster volumes? Do these effects appear linear or nonlinear? Try to interpret these effects using what the three parameters mean physically.
-– Are the effects identified above similar over all central moments (i.e., over all response variables), or are there effects which differ between, say, the mean and the variance? Try to interpret the latter effects using the three parameters mean physically.
-– Try to interpret any interaction effects using what the three parameters mean physically.
-
-```{r}
-summary(r4_poly)
-```
-Reynolds number Re, gravitational acceleration Fr, and particle characteristic St (details in presentation slides)

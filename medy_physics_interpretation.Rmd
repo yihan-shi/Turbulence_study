@@ -1,19 +1,19 @@
 ---
-title: "medy_case_study"
+title: "medy_physics_interpretation"
 author: "Medy Mu"
-date: '2022-10-31'
-output: html_document
+date: "2022-11-02"
+output: pdf_document
 ---
 
-```{r}
-library(dplyr)
-library(glmnet)
-library(splines)
-library(boot)
-library(gam)
-library(gamreg)
-library(kableExtra)
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
 ```
+
+
+## Raw Moment 1
+
+
+## Raw Moment 2
 
 ```{r}
 train <- read.csv("data-train.csv")
@@ -28,20 +28,12 @@ train$Fr_logit <-  asymptote / (1 + exp((midpoint - train$Fr) * scale))
 train$Fr_logit
 ```
 
-
 ```{r}
 #convert to central moments
 train$C_moment_1 <- 0
 train$C_moment_2 <- train$R_moment_2 - (train$R_moment_1)^2
 train$C_moment_3 <- train$R_moment_3 - 3*train$R_moment_1*train$R_moment_2 + 2*(train$R_moment_1)^3
 train$C_moment_4 <- train$R_moment_4 - 4*train$R_moment_1*train$R_moment_3 + 6*(train$R_moment_1)^2*train$R_moment_2 -3*(train$R_moment_1)^4
-```
-
-```{r}
-#set.seed(1)
-#sub_train <- sample(1:nrow(train), nrow(train)*0.7) ## split data into train and test
-#sub_test <- train[-sub_train,]
-#sub_train <- train[sub_train,]
 ```
 
 ```{r}
@@ -61,6 +53,8 @@ drop <- c("St", "Fr_logit", "Re")
 cor <- cor(train[,(names(train) %in% drop)])
 cor
 ```
+
+### Least Square Regression
 
 ```{r}
 # least square model
@@ -114,20 +108,17 @@ adjR2_ls <- max(adj.r2)
 adjR2_ls
 ```
 
-
-```{r}
-#ls_pred_int <- predict(r2_ls_int, newdata = sub_test)
-#mean((sub_test$R_moment_2 - exp(ls_pred_int))^2)
-```
-
 ```{r}
 par(mfrow=c(2,2))
 plot(r2_ls)
 ```
+
 ```{r}
 par(mfrow=c(2,2))
 plot(r2_ls_int)
 ```
+
+### Polynomial Model
 
 ```{r}
 set.seed(1)
@@ -167,10 +158,6 @@ for(i in 1:K){
 #find MSE for each degree 
 colMeans(mse)
 ```
-```{r}
-adj.r2
-```
-
 
 ```{r}
 mse_poly<- min(colMeans(mse))
@@ -184,13 +171,6 @@ adjR2_poly
 r2_poly <- lm(log(R_moment_2) ~ poly(St,5) + Re + poly(Fr_logit,2) + Re*Fr_logit, data = train)
 summary(r2_poly)
 ```
-```{r}
-#poly_pred <- predict(r2_poly, newdata=sub_test)
-#mean((exp(poly_pred)-sub_test$R_moment_2)^2) 
-```
-
-
-## Non linear modeling
 
 ### Natural spline
 ```{r}
@@ -242,6 +222,7 @@ for(i in 1:K){
 #find MSE for each degree 
 colMeans(mse)
 ```
+
 ```{r}
 mse_spline<- min(colMeans(mse)[4:15])
 mse_spline
@@ -255,22 +236,9 @@ adjR2_spline
 plot(4:15, colMeans(mse)[4:15], type="b", xlab="Degrees of freedom", ylab="Cross validation error")
 ```
 
-
-```{r}
-#set.seed(1)
-#cv.err <- rep(0,15)
-#for (i in 4:15) {
-#model.fit <- glm(log(R_moment_2) ~ ns(St, df = i) + Re + Fr_logit + Re*Fr_logit, data = train)
-#cv.err[i] <- cv.glm(train, model.fit, K=5)$delta[1]
-#}
-
-#plot(4:15, cv.err[4:15], type="b", xlab="Degrees of freedom", ylab="Cross validation error")
-```
-
-
 ```{r}
 r2_spline <- glm(log(R_moment_2) ~ ns(St, df = 6) + Re + Fr_logit + Re*Fr_logit, data = train)
-attr(ns(train$St, df = 6), "knots")
+attr(ns(sub_train$St, df = 6), "knots")
 summary(r2_spline)
 ```
 
@@ -279,11 +247,7 @@ par(mfrow = c(2,2))
 plot(r2_spline)
 ```
 
-```{r}
-#spline_pred <- predict(r2_spline, newdata = sub_test)
-#mean((sub_test$R_moment_2 - exp(spline_pred))^2)
-```
-
+### Generalized Additive Model
 
 ```{r}
 set.seed(1)
@@ -341,13 +305,6 @@ par(mfrow = c(1,3))
 plot(r2_gam, se = TRUE, col = "blue")
 ```
 
-
-
-```{r}
-#gam_pred <- predict(r2_gam, newdata = sub_test)
-#mean((sub_test$R_moment_2 - exp(gam_pred))^2)
-```
-
 ```{r}
 # make a MSE table
 models <- c("Least square regression",
@@ -373,7 +330,301 @@ df %>%
   kable_styling()
 ```
 
-## R_moment_4
+```{r}
+summary(r2_poly)
+```
+
+– How does each of the three parameters (Re, Fr, St) affect the distribution of particle cluster volumes? Do these effects appear linear or nonlinear? Try to interpret these effects using what the three parameters mean physically.
+– Are the effects identified above similar over all central moments (i.e., over all response variables), or are there effects which differ between, say, the mean and the variance? Try to interpret the latter effects using the three parameters mean physically.
+– Try to interpret any interaction effects using what the three parameters mean physically.
+
+Generalized additive model (GAM) yields the lowest MSE and highest adjusted R^2, suggesting that it outperforms all other models fitted and thus has a high preditive power for raw moment 2. However, GAMs lacks interpretibility compared to simpler models, such as polynomial regression and least square regression. For statistical inference, therefore, polynomial models were chosen to 
+
+
+## Raw Moment 3
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+plot(density(train$St))
+```
+
+```{r}
+plot(density(log(train$St)))
+```
+
+```{r}
+plot(density(train$R_moment_3))
+```
+
+```{r}
+plot(density(log(train$R_moment_3)))
+```
+
+```{r}
+train$St_log <- log(train$St)
+```
+
+```{r}
+asymptote <- 25
+scale <- 2
+midpoint <- 0.3
+train$Fr_logit <-  asymptote / (1 + exp((midpoint - train$Fr) * scale))
+```
+
+```{r}
+train$R_moment_3_log <- log(train$R_moment_3)
+train
+```
+
+```{r}
+var <- c("St_log", "Re", "Fr_logit", "R_moment_3_log")
+cor <- pairs(train[,(names(train) %in% var)])
+cor
+```
+
+## Least Square Regression
+
+```{r}
+set.seed(1)
+#randomly shuffle data
+df.shuffled <- train[sample(nrow(train)),]
+#define number of folds to use for k-fold cross-validation
+K <- 5
+#create k equal-sized folds
+folds <- cut(seq(1,nrow(df.shuffled)),breaks=K,labels=FALSE)
+#create object to hold MSE's of models
+linear_mse = rep(0,5)
+linear_R2 <- rep(0,5)
+#Perform K-fold cross validation
+for(i in 1:K){
+    
+    #define training and testing data
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    testData <- df.shuffled[testIndexes, ]
+    trainData <- df.shuffled[-testIndexes, ]
+    
+    #use k-fold cv to evaluate models
+    linear = lm(R_moment_3_log~St_log+Re+Fr_logit, data = trainData)
+    fit.test = predict(linear, newdata=testData)
+    linear_mse[i] = mean((exp(fit.test)-testData$R_moment_3)^2) 
+    linear_R2[i] <- summary(linear)$adj.r.squared
+}
+```
+
+```{r}
+summary(linear)
+```
+
+```{r}
+plot(linear)
+```
+
+```{r}
+mse_linear <- mean(linear_mse)
+mse_linear
+R2_linear <- max(linear_R2)
+R2_linear
+```
+
+### Least Square Regression with Interactions
+
+```{r}
+set.seed(1)
+#randomly shuffle data
+df.shuffled <- train[sample(nrow(train)),]
+#define number of folds to use for k-fold cross-validation
+K <- 5
+#create k equal-sized folds
+folds <- cut(seq(1,nrow(df.shuffled)),breaks=K,labels=FALSE)
+#create object to hold MSE's of models
+interaction_mse = rep(0,5)
+interaction_R2 <- rep(0,5)
+#Perform K-fold cross validation
+for(i in 1:K){
+    
+    #define training and testing data
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    testData <- df.shuffled[testIndexes, ]
+    trainData <- df.shuffled[-testIndexes, ]
+    
+    #use k-fold cv to evaluate models
+    interaction = lm(R_moment_3_log~St_log+Re+Fr_logit+Re*Fr_logit, data = trainData)
+    fit.test = predict(interaction, newdata=testData)
+    interaction_mse[i] = mean((exp(fit.test)-testData$R_moment_3)^2) 
+    interaction_R2[i] <- summary(interaction)$adj.r.squared
+}
+```
+
+```{r}
+summary(interaction)
+```
+
+```{r}
+plot(interaction)
+```
+
+```{r}
+mse_interaction <- mean(interaction_mse)
+mse_interaction
+R2_interaction <- max(interaction_R2)
+R2_interaction
+```
+
+### Polynomial Model
+
+```{r}
+set.seed(1)
+#randomly shuffle data
+df.shuffled <- train[sample(nrow(train)),]
+#define number of folds to use for k-fold cross-validation
+K <- 5
+#create k equal-sized folds
+folds <- cut(seq(1,nrow(df.shuffled)),breaks=K,labels=FALSE)
+#create object to hold MSE's of models
+poly_mse = matrix(data=NA,nrow=K,ncol=10)
+poly_R2 <- matrix(data=NA,nrow=K,ncol=10)
+#Perform K-fold cross validation
+for(i in 1:K){
+    
+    #define training and testing data
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    testData <- df.shuffled[testIndexes, ]
+    trainData <- df.shuffled[-testIndexes, ]
+    
+    #use k-fold cv to evaluate models
+    for (j in 1:10){
+        poly = lm(R_moment_3_log ~ poly(St_log,j)+Re+poly(Fr_logit,2)+Re*Fr_logit, data = trainData)
+        fit.test = predict(poly, newdata=testData)
+        poly_mse[i,j] = mean((exp(fit.test)-testData$R_moment_3)^2) 
+        poly_R2[i,j] <- summary(poly)$adj.r.squared
+    }
+}
+```
+
+```{r}
+colMeans(poly_mse)
+colMeans(poly_R2)
+min(colMeans(poly_mse))
+max(colMeans(poly_R2))
+```
+
+```{r}
+poly <- lm(R_moment_3_log ~ poly(St_log,3)+Re+poly(Fr_logit,2)+Re*poly(Fr_logit,2), data = train)
+```
+
+```{r}
+summary(poly)
+```
+
+```{r}
+plot(poly)
+```
+
+```{r}
+mse_poly <- colMeans(poly_mse)[3]
+mse_poly
+R2_poly <- colMeans(poly_R2)[3]
+R2_poly
+```
+
+```{r}
+length(unique(train$St))
+```
+
+### Natural Spline
+
+```{r}
+RSS <- rep(0,13)
+for (i in 3:13) {
+  spline <- glm(log(R_moment_2) ~ bs(St, df = i) + Re + Fr_logit + Re*Fr_logit, data = train)
+  RSS[i] <- sum(spline$residuals^2)
+}
+plot(3:13, RSS[3:13], type="b", xlab="Degrees of freedom", ylab = "RSS")
+title("RSS vs. Degrees of freedom")
+```
+```{r}
+set.seed(1)
+#randomly shuffle data
+df.shuffled <- train[sample(nrow(train)),]
+#define number of folds to use for k-fold cross-validation
+K <- 5
+#create k equal-sized folds
+folds <- cut(seq(1,nrow(df.shuffled)),breaks=K,labels=FALSE)
+#create object to hold MSE's of models
+spline_mse = matrix(data=NA,nrow=K,ncol=13)
+spline_R2 <- matrix(data=NA,nrow=K,ncol=13)
+#Perform K-fold cross validation
+for(i in 1:K){
+    
+    #define training and testing data
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    testData <- df.shuffled[testIndexes, ]
+    trainData <- df.shuffled[-testIndexes, ]
+    
+    #use k-fold cv to evaluate models
+    for (j in 3:13){
+        spline = glm(R_moment_3_log ~ ns(St_log, df = j)+Re+poly(Fr_logit,2)+Re*Fr_logit, data = trainData)
+        fit.test = predict(spline, newdata=testData)
+        spline_mse[i,j] = mean((exp(fit.test)-testData$R_moment_3)^2) 
+        spline_R2[i,j] <- with(summary(spline), 1 - deviance/null.deviance)
+    }
+}
+```
+
+```{r}
+colMeans(spline_mse)
+colMeans(spline_R2)
+min(colMeans(spline_mse), na.rm=TRUE)
+max(colMeans(spline_R2), na.rm=TRUE)
+```
+
+```{r}
+spline <- glm(R_moment_3_log ~ ns(St_log, df = 3)+Re+poly(Fr_logit,2)+Re*Fr_logit, data = trainData)
+summary(spline)
+```
+
+```{r}
+plot(spline)
+```
+
+```{r}
+mse_spline <- colMeans(spline_mse)[3]
+mse_spline
+R2_spline <- colMeans(spline_R2)[3]
+R2_spline
+```
+
+```{r}
+# make a MSE table
+models <- c("Least square regression",
+            "Interaction", 
+            "Polynomial regression", 
+            "Natural spline")
+mse <- c(mse_linear, 
+         mse_interaction, 
+         mse_poly,
+         mse_spline)
+R2 <- c(R2_linear,
+        R2_interaction, 
+        R2_poly,
+        R2_spline)
+formula <- c("log(R_moment_3) ~ log(St)+Re+logit(Fr)",
+            "log(R_moment_3) ~ log(St)+Re+logit(Fr)+Re*logit(Fr)",
+             "log(R_moment_3) ~ poly(log(St),3)+Re+poly(logit(Fr),2)+Re*logit(Fr)",
+             "log(R_moment_3) ~ ns(log(St),df=3)+Re+poly(logit(Fr),2)+Re*logit(Fr)"
+             )
+df <- data.frame(models, formula, mse, R2)
+df %>% 
+  kbl() %>% 
+  kable_styling()
+```
+
+
+## Raw Moment 4
 
 ```{r}
 plot(density(train$R_moment_4))
@@ -387,7 +638,7 @@ plot(train$St, log(train$R_moment_4), type = "b")
 plot(train$Re, log(train$R_moment_4), type = "b")
 ```
 
-
+### Least Square Regression
 
 ```{r}
 # least square model
@@ -423,7 +674,7 @@ for(i in 1:K){
     #use k-fold cv to evaluate models
     fit.train = lm(log(R_moment_4) ~ St + Re + Fr_logit , data = trainData)
     fit.test = predict(fit.train, newdata=testData)
-    mse[i] = mean((exp(fit.test)-testData$R_moment_4)^2) 
+    mse[i] = mean((exp(fit.test)-testData$R_moment_2)^2) 
     adj.r2[i] <- summary(fit.train)$adj.r.squared
     
 }
@@ -456,6 +707,8 @@ par(mfrow=c(2,2))
 plot(r4_ls_int)
 ```
 
+### Polynomial Model
+
 ```{r}
 set.seed(1)
 #randomly shuffle data
@@ -486,7 +739,7 @@ for(i in 1:K){
     for (j in 1:degree){
         fit.train = lm(log(R_moment_4) ~ poly(St,j) + Re + Fr_logit, data = trainData)
         fit.test = predict(fit.train, newdata=testData)
-        mse[i,j] = mean((exp(fit.test)-testData$R_moment_4)^2) 
+        mse[i,j] = mean((exp(fit.test)-testData$R_moment_2)^2) 
         adj.r2[i,j] <- summary(fit.train)$adj.r.squared
     }
 }
@@ -518,9 +771,6 @@ summary(r4_poly)
 #poly_pred <- predict(r2_poly, newdata=sub_test)
 #mean((exp(poly_pred)-sub_test$R_moment_2)^2) 
 ```
-
-
-## Non linear modeling
 
 ### Natural spline
 ```{r}
@@ -565,7 +815,7 @@ for(i in 1:K){
         adj.r2[i,j] <- with(summary(fit.train), 1 - deviance/null.deviance)
         
         fit.test = predict(fit.train, newdata=testData)
-        mse[i,j] = mean((exp(fit.test)-testData$R_moment_4)^2) 
+        mse[i,j] = mean((exp(fit.test)-testData$R_moment_2)^2) 
     }
 }
 
@@ -581,22 +831,8 @@ adjR2_spline
 
 ```
 
-
 ```{r}
 plot(4:15, colMeans(mse)[4:15], type="b", xlab="Degrees of freedom", ylab="Cross validation error")
-```
-
-
-
-```{r}
-#set.seed(1)
-#cv.err <- rep(0,15)
-#for (i in 4:15) {
-#model.fit <- glm(log(R_moment_2) ~ ns(St, df = i) + Re + Fr_logit + Re*Fr_logit, data = train)
-#cv.err[i] <- cv.glm(train, model.fit, K=5)$delta[1]
-#}
-
-#plot(4:15, cv.err[4:15], type="b", xlab="Degrees of freedom", ylab="Cross validation error")
 ```
 
 
@@ -611,11 +847,7 @@ par(mfrow = c(2,2))
 plot(r4_spline)
 ```
 
-```{r}
-#spline_pred <- predict(r2_spline, newdata = sub_test)
-#mean((sub_test$R_moment_2 - exp(spline_pred))^2)
-```
-
+### Generalized Additive Model
 
 ```{r}
 set.seed(1)
@@ -648,7 +880,7 @@ for(i in 1:K){
         fit.train = gam(log(R_moment_4) ~ ns(St, j) + Re + Fr_logit, data = trainData)
         adj.r2[i,j] <- with(summary(fit.train), 1 - deviance/null.deviance)
         fit.test = predict(fit.train, newdata=testData)
-        mse[i,j] = mean((exp(fit.test)-testData$R_moment_4)^2) 
+        mse[i,j] = mean((exp(fit.test)-testData$R_moment_2)^2) 
     }
 }
 
@@ -672,14 +904,6 @@ r4_gam <- gam(log(R_moment_2) ~ ns(St, df = 2) + Re + Fr_logit, data = train)
 ```{r}
 par(mfrow = c(1,3))
 plot(r4_gam, se = TRUE, col = "blue")
-```
-
-
-
-
-```{r}
-#gam_pred <- predict(r2_gam, newdata = sub_test)
-#mean((sub_test$R_moment_2 - exp(gam_pred))^2)
 ```
 
 ```{r}
@@ -706,13 +930,3 @@ df %>%
   kbl() %>% 
   kable_styling()
 ```
-
-
-– How does each of the three parameters (Re, Fr, St) affect the distribution of particle cluster volumes? Do these effects appear linear or nonlinear? Try to interpret these effects using what the three parameters mean physically.
-– Are the effects identified above similar over all central moments (i.e., over all response variables), or are there effects which differ between, say, the mean and the variance? Try to interpret the latter effects using the three parameters mean physically.
-– Try to interpret any interaction effects using what the three parameters mean physically.
-
-```{r}
-summary(r4_poly)
-```
-Reynolds number Re, gravitational acceleration Fr, and particle characteristic St (details in presentation slides)

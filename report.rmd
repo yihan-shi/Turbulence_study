@@ -42,6 +42,12 @@ train$C_moment_3 <- train$R_moment_3 - 3*train$R_moment_1*train$R_moment_2 + 2*(
 train$C_moment_4 <- train$R_moment_4 - 4*train$R_moment_1*train$R_moment_3 + 6*(train$R_moment_1)^2*train$R_moment_2 -3*(train$R_moment_1)^4
 ```
 
+```{r}
+train$St_log <- log(train$St)
+train$R_moment_3_log <- log(train$R_moment_3)
+train
+```
+
 # Introduction
 
 "We are experiencing some turbulence, please fasten your seat belt." Many of us might have heard this radio on the plane and felt bumpy. When we mix paint in water, we can also observe turbulence as the color dissipates. Turbulence is so common and easily observed in daily life, yet its causes and effects are hard to predict. In fluid dynamics, turbulence is "characterized by chaotic changes in pressure and flow velocity". With some knowledge and observation in parameters such as fluid density, flow speed, and the property of particles that cluster inside turbulent flows, we can gain insights into the distribution and clustering of particles in idealized turbulence. In this case study, we will investigate 3 observed features that might contribute to particle distribution in turbulence: Reynolds number (Re), which takes flow speed, viscosity, and density into account; Gravitational acceleration (Fr); Stokes number (St) that quantifies particle characteristics like size, relaxation time, and particle diameter. We hope to use these 3 features to explain changes in particle distribution as well as extrapolate beyond the scope of the known observations.
@@ -391,7 +397,7 @@ title("RSS vs. Degrees of freedom")
 
 ```{r}
 #define number of folds to use for k-fold cross-validation
-K <- 5
+K <- 10
 
 #define degree of polynomials to fit
 degree <- 15
@@ -551,21 +557,6 @@ plot(density(train$R_moment_3))
 plot(density(log(train$R_moment_3)))
 ```
 
-```{r}
-train$St_log <- log(train$St)
-```
-
-```{r}
-asymptote <- 25
-scale <- 2
-midpoint <- 0.3
-train$Fr_logit <-  asymptote / (1 + exp((midpoint - train$Fr) * scale))
-```
-
-```{r}
-train$R_moment_3_log <- log(train$R_moment_3)
-train
-```
 
 ```{r}
 var <- c("St_log", "Re", "Fr_logit", "R_moment_3_log")
@@ -592,7 +583,7 @@ for(i in 1:K){
     trainData <- df.shuffled[-testIndexes, ]
     
     #use k-fold cv to evaluate models
-    linear = lm(R_moment_3_log~St_log+Re+Fr_logit, data = trainData)
+    linear = lm(log(R_moment_3)~St_log+Re+Fr_logit, data = trainData)
     fit.test = predict(linear, newdata=testData)
     linear_mse[i] = mean((exp(fit.test)-testData$R_moment_3)^2) 
     linear_R2[i] <- summary(linear)$adj.r.squared
@@ -633,7 +624,7 @@ for(i in 1:K){
     trainData <- df.shuffled[-testIndexes, ]
     
     #use k-fold cv to evaluate models
-    interaction = lm(R_moment_3_log~St_log+Re+Fr_logit+Re*Fr_logit, data = trainData)
+    interaction = lm(log(R_moment_3)~St_log+Re+Fr_logit+Re*Fr_logit, data = trainData)
     fit.test = predict(interaction, newdata=testData)
     interaction_mse[i] = mean((exp(fit.test)-testData$R_moment_3)^2) 
     interaction_R2[i] <- summary(interaction)$adj.r.squared
@@ -675,7 +666,7 @@ for(i in 1:K){
     
     #use k-fold cv to evaluate models
     for (j in 1:10){
-        poly = lm(R_moment_3_log ~ poly(St_log,j)+Re+poly(Fr_logit,2)+Re*Fr_logit, data = trainData)
+        poly = lm(log(R_moment_3) ~ poly(St_log,j)+Re+poly(Fr_logit,2)+Re*Fr_logit, data = trainData)
         fit.test = predict(poly, newdata=testData)
         poly_mse[i,j] = mean((exp(fit.test)-testData$R_moment_3)^2) 
         poly_R2[i,j] <- summary(poly)$adj.r.squared
@@ -691,7 +682,7 @@ max(colMeans(poly_R2))
 ```
 
 ```{r}
-poly <- lm(R_moment_3_log ~ poly(St_log,3)+Re+poly(Fr_logit,2)+Re*poly(Fr_logit,2), data = train)
+poly <- lm(log(R_moment_3) ~ poly(St_log,3)+Re+poly(Fr_logit,2)+Re*poly(Fr_logit,2), data = train)
 ```
 
 ```{r}
@@ -743,7 +734,7 @@ for(i in 1:K){
     
     #use k-fold cv to evaluate models
     for (j in 3:13){
-        spline = glm(R_moment_3_log ~ ns(St_log, df = j)+Re+poly(Fr_logit,2)+Re*Fr_logit, data = trainData)
+        spline = glm(log(R_moment_3) ~ ns(St_log, df = j)+Re+poly(Fr_logit,2)+Re*Fr_logit, data = trainData)
         fit.test = predict(spline, newdata=testData)
         spline_mse[i,j] = mean((exp(fit.test)-testData$R_moment_3)^2) 
         spline_R2[i,j] <- with(summary(spline), 1 - deviance/null.deviance)
@@ -759,7 +750,7 @@ max(colMeans(spline_R2), na.rm=TRUE)
 ```
 
 ```{r}
-spline <- glm(R_moment_3_log ~ ns(St_log, df = 3)+Re+poly(Fr_logit,2)+Re*Fr_logit, data = trainData)
+spline <- glm(log(R_moment_3) ~ ns(St_log, df = 3)+Re+poly(Fr_logit,2)+Re*Fr_logit, data = trainData)
 summary(spline)
 ```
 
@@ -844,9 +835,9 @@ for(i in 1:K){
     trainData <- df.shuffled[-testIndexes, ]
     
     #use k-fold cv to evaluate models
-    fit.train = lm(log(R_moment_4) ~ St + Re + Fr_logit , data = trainData)
+    fit.train = lm(log(R_moment_4) ~ St + Re + Fr_logit + Re*Fr_logit, data = trainData)
     fit.test = predict(fit.train, newdata=testData)
-    mse[i] = mean((exp(fit.test)-testData$R_moment_2)^2) 
+    mse[i] = mean((exp(fit.test)-testData$R_moment_4)^2) 
     adj.r2[i] <- summary(fit.train)$adj.r.squared
     
 }
@@ -905,9 +896,9 @@ for(i in 1:K){
     
     #use k-fold cv to evaluate models
     for (j in 1:degree){
-        fit.train = lm(log(R_moment_4) ~ poly(St,j) + Re + Fr_logit, data = trainData)
+        fit.train = lm(log(R_moment_4) ~ poly(St,j) + Re + poly(Fr_logit,2) + Re*Fr_logit , data = trainData)
         fit.test = predict(fit.train, newdata=testData)
-        mse[i,j] = mean((exp(fit.test)-testData$R_moment_2)^2) 
+        mse[i,j] = mean((exp(fit.test)-testData$R_moment_4)^2) 
         adj.r2[i,j] <- summary(fit.train)$adj.r.squared
     }
 }
@@ -915,10 +906,6 @@ for(i in 1:K){
 #find MSE for each degree 
 colMeans(mse)
 ```
-```{r}
-adj.r2
-```
-
 
 ```{r}
 mse_poly<- min(colMeans(mse))
@@ -930,15 +917,11 @@ adjR2_poly
 
 
 ```{r}
-r4_poly <- lm(log(R_moment_4) ~ poly(St,2) + Re + Fr_logit, data = train)
+r4_poly <- lm(log(R_moment_4) ~ poly(St,2) + Re + poly(Fr_logit,2) + Re*Fr_logit, data = train)
 summary(r4_poly)
 ```
 
 
-```{r}
-#poly_pred <- predict(r2_poly, newdata=sub_test)
-#mean((exp(poly_pred)-sub_test$R_moment_2)^2) 
-```
 
 ### Natural spline
 ```{r}
@@ -954,7 +937,7 @@ title("RSS vs. Degrees of freedom")
 
 ```{r}
 #define number of folds to use for k-fold cross-validation
-K <- 5
+K <- 10
 
 #define degree of polynomials to fit
 degree <- 15
@@ -976,11 +959,11 @@ for(i in 1:K){
     
     #use k-fold cv to evaluate models
     for (j in 4:degree){
-        fit.train =  glm(log(R_moment_4) ~ ns(St, df = j) + Re + Fr_logit, data = trainData)
+        fit.train =  glm(log(R_moment_4) ~ ns(St, df = j) + Re + Fr_logit + Re*Fr_logit, data = trainData)
         adj.r2[i,j] <- with(summary(fit.train), 1 - deviance/null.deviance)
         
         fit.test = predict(fit.train, newdata=testData)
-        mse[i,j] = mean((exp(fit.test)-testData$R_moment_2)^2) 
+        mse[i,j] = mean((exp(fit.test)-testData$R_moment_4)^2) 
     }
 }
 
@@ -992,7 +975,7 @@ colMeans(mse)
 mse_spline<- min(colMeans(mse)[4:15])
 mse_spline
 
-adjR2_spline <- max(adj.r2[,4])
+adjR2_spline <- max(adj.r2[,6])
 adjR2_spline
 
 ```
@@ -1003,8 +986,8 @@ plot(4:15, colMeans(mse)[4:15], type="b", xlab="Degrees of freedom", ylab="Cross
 
 
 ```{r}
-r4_spline <- glm(log(R_moment_4) ~ ns(St, df = 4) + Re + Fr_logit, data = train)
-attr(ns(train$St, df = 4), "knots")
+r4_spline <- glm(log(R_moment_4) ~ ns(St, df = 6) + Re + Fr_logit + Re*Fr_logit, data = train)
+attr(ns(train$St, df = 6), "knots")
 summary(r4_spline)
 ```
 
@@ -1039,10 +1022,10 @@ for(i in 1:K){
     
     #use k-fold cv to evaluate models
     for (j in 1:degree){
-        fit.train = gam(log(R_moment_4) ~ ns(St, j) + Re + Fr_logit, data = trainData)
+        fit.train = gam(log(R_moment_4) ~ ns(St, j) + Re + ns(Fr_logit,2) + Re*ns(Fr_logit,2) , data = trainData)
         adj.r2[i,j] <- with(summary(fit.train), 1 - deviance/null.deviance)
         fit.test = predict(fit.train, newdata=testData)
-        mse[i,j] = mean((exp(fit.test)-testData$R_moment_2)^2) 
+        mse[i,j] = mean((exp(fit.test)-testData$R_moment_4)^2) 
     }
 }
 
@@ -1054,13 +1037,13 @@ colMeans(mse)
 mse_gam<- min(colMeans(mse))
 mse_gam
 
-adjR2_gam <- max(adj.r2[,2])
+adjR2_gam <- max(adj.r2[,1])
 adjR2_gam
 ```
 
 
 ```{r}
-r4_gam <- gam(log(R_moment_2) ~ ns(St, df = 2) + Re + Fr_logit, data = train)
+r4_gam <- gam(log(R_moment_4) ~ St + Re + ns(Fr_logit,2) + Re*ns(Fr_logit,2) , data = train)
 ```
 
 ```{r}
@@ -1082,10 +1065,638 @@ adj.R <- c(adjR2_ls,
            adjR2_poly,
            adjR2_spline,
            adjR2_gam)
-formula <- c("log(R_moment_4) ~ Fr + Re + St",
-            "log(R_moment_4) ~ Fr + Re + poly(St, 2)",
-             "log(R_moment_4) ~ ns(St, df = 4) + Fr + Re",
-             "log(R_moment_4) ~ ns(St, df = 2) + Re + Fr"
+formula <- c("log(R_moment_4) ~ Fr + Re + St + Fr * Re",
+            "log(R_moment_4) ~ poly(Fr,2) + Re + poly(St, 2) + Fr * Re",
+             "log(R_moment_4) ~ ns(St, df = 6) + Fr + Re + Fr * Re",
+             "log(R_moment_4) ~ St + Re + ns(Fr_logit,2) + Re:ns(Fr_logit,2)"
+             )
+df <- data.frame(models, formula, mse, adj.R)
+df %>% 
+  kbl() %>% 
+  kable_styling()
+```
+
+# C_moment_2
+
+```{r}
+plot(density(train$C_moment_2))
+plot(density(log(train$C_moment_2)))
+
+plot(density(train$St))
+
+plot(density(train$Re))
+
+plot(train$St, log(train$C_moment_2), type = "b")
+plot(train$Re, log(train$C_moment_2), type = "b")
+```
+
+```{r}
+drop <- c("St", "Fr_logit", "Re")
+cor <- cor(train[,(names(train) %in% drop)])
+cor
+```
+
+```{r}
+# least square model
+c2_ls <- lm(log(C_moment_2) ~ St + Re + Fr_logit, data = train)
+c2_ls_int <- lm(log(C_moment_2) ~ St + Re + Fr_logit + Re*Fr_logit, data = train)
+summary(c2_ls)
+summary(c2_ls_int)
+```
+
+```{r}
+set.seed(1)
+#randomly shuffle data
+df.shuffled <- train[sample(nrow(train)),]
+
+#define number of folds to use for k-fold cross-validation
+K <- 5
+
+#create k equal-sized folds
+folds <- cut(seq(1,nrow(df.shuffled)),breaks=K,labels=FALSE)
+
+#create object to hold MSE's of models
+mse = rep(0,5)
+adj.r2 <- rep(0,5)
+
+#Perform K-fold cross validation
+for(i in 1:K){
+    
+    #define training and testing data
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    testData <- df.shuffled[testIndexes, ]
+    trainData <- df.shuffled[-testIndexes, ]
+    
+    #use k-fold cv to evaluate models
+    fit.train = lm(log(C_moment_2) ~ St + Re + Fr_logit + Re*Fr_logit, data = trainData)
+    fit.test = predict(fit.train, newdata=testData)
+    mse[i] = mean((exp(fit.test)-testData$C_moment_2)^2) 
+    adj.r2[i] <- summary(fit.train)$adj.r.squared
+    
+}
+
+#find MSE
+mean(mse)
+
+```
+
+```{r}
+mse_ls <- mean(mse)
+mse_ls
+
+adjR2_ls <- max(adj.r2)
+adjR2_ls
+```
+
+
+```{r}
+#ls_pred_int <- predict(r2_ls_int, newdata = sub_test)
+#mean((sub_test$R_moment_2 - exp(ls_pred_int))^2)
+```
+
+```{r}
+par(mfrow=c(2,2))
+plot(c2_ls)
+```
+```{r}
+par(mfrow=c(2,2))
+plot(c2_ls_int)
+```
+
+```{r}
+set.seed(1)
+#randomly shuffle data
+df.shuffled <- train[sample(nrow(train)),]
+
+#define number of folds to use for k-fold cross-validation
+K <- 5
+
+#define degree of polynomials to fit
+degree <- 10
+
+#create k equal-sized folds
+folds <- cut(seq(1,nrow(df.shuffled)),breaks=K,labels=FALSE)
+
+#create object to hold MSE's of models
+mse = matrix(data=NA,nrow=K,ncol=degree)
+adj.r2 <- matrix(data=NA,nrow=K,ncol=degree)
+
+#Perform K-fold cross validation
+for(i in 1:K){
+    
+    #define training and testing data
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    testData <- df.shuffled[testIndexes, ]
+    trainData <- df.shuffled[-testIndexes, ]
+    
+    #use k-fold cv to evaluate models
+    for (j in 1:degree){
+        fit.train = lm(log(C_moment_2) ~ poly(St,j) + Re + poly(Fr_logit,2) + Re*Fr_logit, data = trainData)
+        fit.test = predict(fit.train, newdata=testData)
+        mse[i,j] = mean((exp(fit.test)-testData$C_moment_2)^2) 
+        adj.r2[i,j] <- summary(fit.train)$adj.r.squared
+    }
+}
+
+#find MSE for each degree 
+colMeans(mse)
+```
+
+
+```{r}
+mse_poly<- min(colMeans(mse))
+mse_poly
+
+adjR2_poly <- max(adj.r2[,2])
+adjR2_poly
+```
+
+```{r}
+c2_poly <- lm(log(C_moment_2) ~ poly(St,2) + Re + poly(Fr_logit,2) + Re*Fr_logit, data = train)
+summary(r2_poly)
+```
+
+```{r}
+#poly_pred <- predict(r2_poly, newdata=sub_test)
+#mean((exp(poly_pred)-sub_test$R_moment_2)^2) 
+```
+
+
+## Non linear modeling
+
+### Natural spline
+
+```{r}
+RSS <- rep(0,15)
+for (i in 4:15) {
+model.fit <- glm(log(C_moment_2) ~ ns(St, df = i) + Re + Fr_logit + Re*Fr_logit, data = train)
+RSS[i] <- sum(model.fit$residuals^2)
+}
+
+plot(4:15, RSS[4:15], type="b", xlab="Degrees of freedom", ylab = "RSS")
+title("RSS vs. Degrees of freedom")
+```
+
+```{r}
+#randomly shuffle data
+df.shuffled <- train[sample(nrow(train)),]
+
+#define number of folds to use for k-fold cross-validation
+K <- 5
+
+#define degree of polynomials to fit
+degree <- 15
+
+#create k equal-sized folds
+folds <- cut(seq(1,nrow(df.shuffled)),breaks=K,labels=FALSE)
+
+#create object to hold MSE's of models
+mse = matrix(data=NA,nrow=K,ncol=degree)
+adj.r2 <- matrix(data=NA,nrow=K,ncol=degree)
+
+#Perform K-fold cross validation
+for(i in 1:K){
+    
+    #define training and testing data
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    testData <- df.shuffled[testIndexes, ]
+    trainData <- df.shuffled[-testIndexes, ]
+    
+    #use k-fold cv to evaluate models
+    for (j in 4:degree){
+        fit.train =  glm(log(C_moment_2) ~ ns(St, df = j) + Re + Fr_logit + Re*Fr_logit, data = trainData)
+        adj.r2[i,j] <- with(summary(fit.train), 1 - deviance/null.deviance)
+        
+        fit.test = predict(fit.train, newdata=testData)
+        mse[i,j] = mean((exp(fit.test)-testData$C_moment_2)^2) 
+    }
+}
+
+#find MSE for each degree 
+colMeans(mse)
+```
+```{r}
+mse_spline<- min(colMeans(mse)[4:15])
+mse_spline
+
+adjR2_spline <- max(adj.r2[,6])
+adjR2_spline
+
+```
+
+```{r}
+plot(4:15, colMeans(mse)[4:15], type="b", xlab="Degrees of freedom", ylab="Cross validation error")
+```
+
+
+```{r}
+#set.seed(1)
+#cv.err <- rep(0,15)
+#for (i in 4:15) {
+#model.fit <- glm(log(R_moment_2) ~ ns(St, df = i) + Re + Fr_logit + Re*Fr_logit, data = train)
+#cv.err[i] <- cv.glm(train, model.fit, K=5)$delta[1]
+#}
+
+#plot(4:15, cv.err[4:15], type="b", xlab="Degrees of freedom", ylab="Cross validation error")
+```
+
+
+```{r}
+c2_spline <- glm(log(C_moment_2) ~ ns(St, df = 6) + Re + Fr_logit + Re*Fr_logit, data = train)
+attr(ns(train$St, df = 6), "knots")
+summary(c2_spline)
+```
+
+```{r}
+par(mfrow = c(2,2))
+plot(c2_spline)
+```
+
+```{r}
+#spline_pred <- predict(r2_spline, newdata = sub_test)
+#mean((sub_test$R_moment_2 - exp(spline_pred))^2)
+```
+
+
+```{r}
+set.seed(1)
+#randomly shuffle data
+df.shuffled <- train[sample(nrow(train)),]
+
+#define number of folds to use for k-fold cross-validation
+K <- 10
+
+#define degree of polynomials to fit
+degree <- 15
+
+#create k equal-sized folds
+folds <- cut(seq(1,nrow(df.shuffled)),breaks=K,labels=FALSE)
+
+#create object to hold MSE's of models
+mse = matrix(data=NA,nrow=K,ncol=degree)
+adj.r2 <- matrix(data=NA,nrow=K,ncol=degree)
+
+#Perform K-fold cross validation
+for(i in 1:K){
+    
+    #define training and testing data
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    testData <- df.shuffled[testIndexes, ]
+    trainData <- df.shuffled[-testIndexes, ]
+    
+    #use k-fold cv to evaluate models
+    for (j in 1:degree){
+        fit.train = gam(log(C_moment_2) ~ ns(St, j) + Re + ns(Fr_logit,2) + Re:ns(Fr_logit,2), data = trainData)
+        adj.r2[i,j] <- with(summary(fit.train), 1 - deviance/null.deviance)
+        fit.test = predict(fit.train, newdata=testData)
+        mse[i,j] = mean((exp(fit.test)-testData$C_moment_2)^2) 
+    }
+}
+
+#find MSE for each degree 
+colMeans(mse)
+```
+
+```{r}
+mse_gam<- min(colMeans(mse))
+mse_gam
+
+adjR2_gam <- max(adj.r2[,4])
+adjR2_gam
+```
+
+```{r}
+c2_gam <- gam(log(R_moment_2) ~ ns(St, df = 4) + Re + ns(Fr_logit, df = 2) + Re:ns(Fr_logit,2), data = train)
+```
+
+```{r}
+par(mfrow = c(1,3))
+plot(c2_gam, se = TRUE, col = "blue")
+```
+
+
+
+```{r}
+# make a MSE table
+models <- c("Least square regression",
+            "Polynomial regression", 
+            "Natural spline", 
+            "Generalized additive model")
+mse <- c(mse_ls, 
+         mse_poly, 
+         mse_spline,
+         mse_gam)
+adj.R <- c(adjR2_ls,
+           adjR2_poly,
+           adjR2_spline,
+           adjR2_gam)
+formula <- c("log(C_moment_2) ~ Fr + Re + St + Fr * Re",
+            "log(C_moment_2) ~ poly(Fr,2) + Re + poly(St, 2) + Fr * Re",
+             "log(C_moment_2) ~ ns(St, df = 6) + Fr + Re + Fr * Re",
+             "log(C_moment_2) ~ ns(St, 4) + Re + ns(Fr_logit,2) + Re:ns(Fr_logit,2)"
+             )
+df <- data.frame(models, formula, mse, adj.R)
+df %>% 
+  kbl() %>% 
+  kable_styling()
+```
+
+## C_moment_4
+
+```{r}
+plot(density(train$C_moment_4))
+plot(density(log(train$C_moment_4)))
+
+plot(density(train$St))
+
+plot(density(train$Re))
+
+plot(train$St, log(train$C_moment_4), type = "b")
+plot(train$Re, log(train$C_moment_4), type = "b")
+```
+
+
+
+```{r}
+# least square model
+c4_ls <- lm(log(C_moment_4) ~ St + Re + Fr_logit, data = train)
+c4_ls_int <- lm(log(C_moment_4) ~ St + Re + Fr_logit + Re*Fr_logit, data = train)
+summary(c4_ls)
+summary(c4_ls_int)
+```
+
+```{r}
+set.seed(1)
+#randomly shuffle data
+df.shuffled <- train[sample(nrow(train)),]
+
+#define number of folds to use for k-fold cross-validation
+K <- 5
+
+#create k equal-sized folds
+folds <- cut(seq(1,nrow(df.shuffled)),breaks=K,labels=FALSE)
+
+#create object to hold MSE's of models
+mse = rep(0,5)
+adj.r2 <- rep(0,5)
+
+#Perform K-fold cross validation
+for(i in 1:K){
+    
+    #define training and testing data
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    testData <- df.shuffled[testIndexes, ]
+    trainData <- df.shuffled[-testIndexes, ]
+    
+    #use k-fold cv to evaluate models
+    fit.train = lm(log(C_moment_4) ~ St + Re + Fr_logit + Re*Fr_logit, data = trainData)
+    fit.test = predict(fit.train, newdata=testData)
+    mse[i] = mean((exp(fit.test)-testData$C_moment_4)^2) 
+    adj.r2[i] <- summary(fit.train)$adj.r.squared
+    
+}
+
+#find MSE
+mean(mse)
+
+```
+
+```{r}
+mse_ls <- mean(mse)
+mse_ls
+
+adjR2_ls <- max(adj.r2)
+adjR2_ls
+```
+
+```{r}
+#ls_pred_int <- predict(r2_ls_int, newdata = sub_test)
+#mean((sub_test$R_moment_2 - exp(ls_pred_int))^2)
+```
+
+```{r}
+par(mfrow=c(2,2))
+plot(c4_ls)
+```
+
+```{r}
+par(mfrow=c(2,2))
+plot(c4_ls_int)
+```
+
+```{r}
+set.seed(1)
+#randomly shuffle data
+df.shuffled <- train[sample(nrow(train)),]
+
+#define number of folds to use for k-fold cross-validation
+K <- 5
+
+#define degree of polynomials to fit
+degree <- 10
+
+#create k equal-sized folds
+folds <- cut(seq(1,nrow(df.shuffled)),breaks=K,labels=FALSE)
+
+#create object to hold MSE's of models
+mse = matrix(data=NA,nrow=K,ncol=degree)
+adj.r2 <- matrix(data=NA,nrow=K,ncol=degree)
+
+#Perform K-fold cross validation
+for(i in 1:K){
+    
+    #define training and testing data
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    testData <- df.shuffled[testIndexes, ]
+    trainData <- df.shuffled[-testIndexes, ]
+    
+    #use k-fold cv to evaluate models
+    for (j in 1:degree){
+        fit.train = lm(log(C_moment_4) ~ poly(St,j) + Re + poly(Fr_logit,2) + Re*Fr_logit, data = trainData)
+        fit.test = predict(fit.train, newdata=testData)
+        mse[i,j] = mean((exp(fit.test)-testData$C_moment_4)^2) 
+        adj.r2[i,j] <- summary(fit.train)$adj.r.squared
+    }
+}
+
+#find MSE for each degree 
+colMeans(mse)
+```
+
+```{r}
+mse_poly<- min(colMeans(mse))
+mse_poly
+
+adjR2_poly <- max(adj.r2[,2])
+adjR2_poly
+```
+
+
+```{r}
+c4_poly <- lm(log(R_moment_4) ~ poly(St,2) + Re + poly(Fr_logit,2) + Re*Fr_logit, data = train)
+summary(c4_poly)
+```
+
+## Non linear modeling
+
+### Natural spline
+```{r}
+RSS <- rep(0,15)
+for (i in 4:15) {
+model.fit <- glm(log(C_moment_4) ~ ns(St, df = i) + Re + Fr_logit + Re*Fr_logit, data = train)
+RSS[i] <- sum(model.fit$residuals^2)
+}
+
+plot(4:15, RSS[4:15], type="b", xlab="Degrees of freedom", ylab = "RSS")
+title("RSS vs. Degrees of freedom")
+```
+
+```{r}
+#randomly shuffle data
+df.shuffled <- train[sample(nrow(train)),]
+
+#define number of folds to use for k-fold cross-validation
+K <- 5
+
+#define degree of polynomials to fit
+degree <- 15
+
+#create k equal-sized folds
+folds <- cut(seq(1,nrow(df.shuffled)),breaks=K,labels=FALSE)
+
+#create object to hold MSE's of models
+mse = matrix(data=NA,nrow=K,ncol=degree)
+adj.r2 <- matrix(data=NA,nrow=K,ncol=degree)
+
+#Perform K-fold cross validation
+for(i in 1:K){
+    
+    #define training and testing data
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    testData <- df.shuffled[testIndexes, ]
+    trainData <- df.shuffled[-testIndexes, ]
+    
+    #use k-fold cv to evaluate models
+    for (j in 4:degree){
+        fit.train =  glm(log(C_moment_4) ~ ns(St, df = j) + Re + Fr_logit + Re*Fr_logit, data = trainData)
+        adj.r2[i,j] <- with(summary(fit.train), 1 - deviance/null.deviance)
+        
+        fit.test = predict(fit.train, newdata=testData)
+        mse[i,j] = mean((exp(fit.test)-testData$C_moment_4)^2) 
+    }
+}
+
+#find MSE for each degree 
+colMeans(mse)
+```
+```{r}
+mse_spline<- min(colMeans(mse)[4:15])
+mse_spline
+
+adjR2_spline <- max(adj.r2[,4])
+adjR2_spline
+
+```
+
+
+```{r}
+plot(4:15, colMeans(mse)[4:15], type="b", xlab="Degrees of freedom", ylab="Cross validation error")
+```
+
+
+```{r}
+c4_spline <- glm(log(C_moment_4) ~ ns(St, df = 6) + Re + Fr_logit + Re*Fr_logit, data = train)
+attr(ns(train$St, df = 4), "knots")
+summary(c4_spline)
+```
+
+```{r}
+par(mfrow = c(2,2))
+plot(c4_spline)
+```
+
+```{r}
+#spline_pred <- predict(r2_spline, newdata = sub_test)
+#mean((sub_test$R_moment_2 - exp(spline_pred))^2)
+```
+
+
+```{r}
+set.seed(1)
+#randomly shuffle data
+df.shuffled <- train[sample(nrow(train)),]
+
+#define number of folds to use for k-fold cross-validation
+K <- 10 
+
+#define degree of polynomials to fit
+degree <- 15
+
+#create k equal-sized folds
+folds <- cut(seq(1,nrow(df.shuffled)),breaks=K,labels=FALSE)
+
+#create object to hold MSE's of models
+mse = matrix(data=NA,nrow=K,ncol=degree)
+adj.r2 <- matrix(data=NA,nrow=K,ncol=degree)
+
+#Perform K-fold cross validation
+for(i in 1:K){
+    
+    #define training and testing data
+    testIndexes <- which(folds==i,arr.ind=TRUE)
+    testData <- df.shuffled[testIndexes, ]
+    trainData <- df.shuffled[-testIndexes, ]
+    
+    #use k-fold cv to evaluate models
+    for (j in 1:degree){
+        fit.train = gam(log(C_moment_4) ~ ns(St, j) + Re + ns(Fr_logit,2) + Re:ns(Fr_logit,2), data = trainData)
+        adj.r2[i,j] <- with(summary(fit.train), 1 - deviance/null.deviance)
+        fit.test = predict(fit.train, newdata=testData)
+        mse[i,j] = mean((exp(fit.test)-testData$C_moment_4)^2) 
+    }
+}
+
+#find MSE for each degree 
+colMeans(mse)
+```
+
+```{r}
+mse_gam<- min(colMeans(mse))
+mse_gam
+
+adjR2_gam <- max(adj.r2[,2])
+adjR2_gam
+```
+
+
+```{r}
+c4_gam <- gam(log(C_moment_2) ~ St + Re + ns(Fr_logit,2) + Re:ns(Fr_logit,2), data = train)
+```
+
+```{r}
+par(mfrow = c(1,3))
+plot(c4_gam, se = TRUE, col = "blue")
+```
+
+
+```{r}
+# make a MSE table
+models <- c("Least square regression",
+            "Polynomial regression", 
+            "Natural spline", 
+            "Generalized additive model")
+mse <- c(mse_ls, 
+         mse_poly, 
+         mse_spline,
+         mse_gam)
+adj.R <- c(adjR2_ls,
+           adjR2_poly,
+           adjR2_spline,
+           adjR2_gam)
+formula <- c("log(C_moment_4) ~ Fr + Re + St + Fr * Re",
+            "log(C_moment_4) ~ poly(Fr,2) + Re + poly(St, 2) + Fr * Re",
+             "log(C_moment_4) ~ ns(St, df = 6) + Fr + Re + Fr * Re",
+             "log(C_moment_4) ~ St + Re + ns(Fr_logit,2) + Re:ns(Fr_logit,2)"
              )
 df <- data.frame(models, formula, mse, adj.R)
 df %>% 
