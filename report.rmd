@@ -38,8 +38,8 @@ train$Fr_logit
 #convert to central moments
 train$C_moment_1 <- 0
 train$C_moment_2 <- train$R_moment_2 - (train$R_moment_1)^2
-train$C_moment_3 <- train$R_moment_3 - 3*train$R_moment_1*train$R_moment_2 + 2*(train$R_moment_1)^3
-train$C_moment_4 <- train$R_moment_4 - 4*train$R_moment_1*train$R_moment_3 + 6*(train$R_moment_1)^2*train$R_moment_2 -3*(train$R_moment_1)^4
+train$C_moment_3 <- (train$R_moment_3 - 3*train$R_moment_1*train$R_moment_2 + 2*(train$R_moment_1)^3)/((train$C_moment_2)^(3/2))
+train$C_moment_4 <- (train$R_moment_4 - 4*train$R_moment_1*train$R_moment_3 + 6*(train$R_moment_1)^2*train$R_moment_2 -3*(train$R_moment_1)^4)/((train$C_moment_2)^2)
 ```
 
 ```{r}
@@ -139,6 +139,11 @@ plot(c(1:10), mean_r2_linear, xlab = "Polynomial Degree", ylab = "Adjusted R^2",
 Using cross-validation with 5 folds, we see the adjusted $R^2$ decreases as polynomial degree increases. The MSE indicates that linear regression is no sufficient. The minimum MSE is achieved with polynomial order 2 on St. We decided that the optimal polynomial order for St is 2 for better interpretation.
 
 We tried removing data of both high leverage and residual. However, this didn't change the MSE and adjusted $R^2$ greatly. Since these observations take up 7% of the full training data, we decided that we don't want to exclude them.
+
+```{r}
+r1_poly <- lm(log(R_moment_1) ~ poly(St,2) + Re + Fr_logit + Re*Fr_logit, data = train)
+summary(r1_poly)
+```
 
 ### Natural spline
 ```{r}
@@ -1213,7 +1218,7 @@ adjR2_poly
 
 ```{r}
 c2_poly <- lm(log(C_moment_2) ~ poly(St,2) + Re + poly(Fr_logit,2) + Re*Fr_logit, data = train)
-summary(r2_poly)
+summary(c2_poly)
 ```
 
 ```{r}
@@ -1533,7 +1538,7 @@ adjR2_poly
 
 
 ```{r}
-c4_poly <- lm(log(R_moment_4) ~ poly(St,2) + Re + poly(Fr_logit,2) + Re*Fr_logit, data = train)
+c4_poly <- lm(log(C_moment_4) ~ poly(St,2) + Re + poly(Fr_logit,2) + Re*Fr_logit, data = train)
 summary(c4_poly)
 ```
 
