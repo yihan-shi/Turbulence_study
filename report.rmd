@@ -30,6 +30,7 @@ asymptote <- 25
 scale <- 2
 midpoint <- 0.3
 train$Fr_logit <-  asymptote / (1 + exp((midpoint - train$Fr) * scale))
+test$Fr_logit <-  asymptote / (1 + exp((midpoint - test$Fr) * scale))
 train$Fr_logit
 ```
 
@@ -224,6 +225,12 @@ plot(c(1:df), mean_r2_gam, xlab = "Degree of Freedom", ylab = "Adjusted R^2",
      type = "l", main = "GAM")
 ```
 
+```{r predict r1}
+fit.gam1 <- gam(log(R_moment_1) ~ s(St, df = 13) + Fr_logit + Re + Fr_logit * Re, data = train)
+fit.pred1 <- exp(predict(fit.gam1, newdata=test))
+```
+
+
 Using cross-validation with 5 folds, we see the adjusted $R^2$ increases as the degree of freedom increases to an extent (around 13). The optimal degrees of freedom for GAM model to achieve the lowest MSE is around 5, but MSE stops increasing after lifting degrees of freedom to 13. For more prediction power, we conclude that a degree of freedom around 13 is optimal.
 
 ```{r}
@@ -240,10 +247,10 @@ adj.R <- c(mse_adjr2,
            max_r2_linear,
            max_r2_ns,
            max_r2_gam)
-formula <- c("R_moment_1 ~ Fr + Re + St + Fr * Re",
-             "R_moment_1 ~ Fr + Re + poly(St, 2) + Fr * Re",
-             "R_moment_1 ~ ns(St, df = 13) + Fr + Re + Fr * Re",
-             "R_moment_1 ~ s(St, 13) + Re + Fr + Fr * Re"
+formula <- c("log(R_moment_1) ~ Fr + Re + St + Fr * Re",
+             "log(R_moment_1) ~ Fr + Re + poly(St, 2) + Fr * Re",
+             "log(R_moment_1) ~ ns(St, df = 7) + Fr + Re + Fr * Re",
+             "log(R_moment_1) ~ s(St, 13) + Re + Fr + Fr * Re"
              )
 df <- data.frame(models, formula, mse, adj.R)
 df %>% 
@@ -502,9 +509,11 @@ adjR2_gam <- max(adj.r2[,4])
 adjR2_gam
 ```
 
-```{r}
+```{r predict r2}
 r2_gam <- gam(log(R_moment_2) ~ ns(St, df = 4) + Re + ns(Fr_logit, df = 2) + Re:ns(Fr_logit,2), data = train)
+fit.pred2 <- exp(predict(r2_gam, newdata=test))
 ```
+
 
 ```{r}
 par(mfrow = c(1,3))
@@ -787,6 +796,10 @@ df %>%
   kable_styling()
 ```
 
+```{r predict r2}
+r3_gam <- gam(log(R_moment_3) ~ ns(log(St), df = 3) + Re + ns(Fr_logit, df = 2) + Re:ns(Fr_logit,2), data = train)
+fit.pred3 <- exp(predict(r2_gam, newdata=test))
+```
 
 ## Raw Moment 4
 
@@ -1041,6 +1054,7 @@ adjR2_gam
 
 ```{r}
 r4_gam <- gam(log(R_moment_4) ~ St + Re + ns(Fr_logit,2) + Re*ns(Fr_logit,2) , data = train)
+fit.pred4 <- exp(predict(r4_gam, newdata=test))
 ```
 
 ```{r}
@@ -1940,3 +1954,14 @@ df %>%
   kbl() %>% 
   kable_styling()
 ```
+
+# Prediction
+```{r}
+test$raw_moment_1 <- fit.pred1
+test$raw_moment_2 <- fit.pred2
+test$raw_moment_3 <- fit.pred3
+test$raw_moment_4 <- fit.pred4
+test
+write.csv(test, here::here("data-test.csv"))
+```
+
