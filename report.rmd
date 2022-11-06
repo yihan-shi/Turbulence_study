@@ -2321,3 +2321,22 @@ test
 #write.csv(test, here::here("data-test.csv"))
 ```
 
+```{r}
+plot(density(test$raw_moment_1))
+plot(density(test$raw_moment_2))
+plot(density(test$raw_moment_3))
+plot(density(test$raw_moment_4))
+summary(test$raw_moment_1)
+summary(test$raw_moment_2)
+summary(test$raw_moment_3)
+summary(test$raw_moment_4)
+boxplot(test$raw_moment_1,test$raw_moment_2,test$raw_moment_3,test$raw_moment_4, horizontal = TRUE, outline=FALSE)
+boxplot(test$raw_moment_1,test$raw_moment_2, horizontal = TRUE, outline=FALSE)
+boxplot(test$raw_moment_3,test$raw_moment_4, horizontal = TRUE, outline=FALSE)
+```
+
+```{r}
+boxplot(train$R_moment_4, horizontal = TRUE)
+```
+
+
