@@ -1,5 +1,5 @@
 ---
-title: "Repoer"
+title: "Report"
 author: "Yihan Shi, Medy Mu, Edna Zhang"
 date: "10/31/2022"
 output: pdf_document
@@ -135,7 +135,7 @@ plot(x, mean_mse_linear, type = "l", xlab = "Polynomial Degree", ylab = "MSE", m
 plot(c(1:10), mean_r2_linear, xlab = "Polynomial Degree", ylab = "Adjusted R^2", main = "Polynomial regression", type = "l")
 ```
 
-Using cross-validation with 5 folds, we see the adjusted $R^2$ decreases as polynomial degree increases. The MSE indicates that linear regression is no sufficient. The minimum MSE is achieved with polynomial order 2 on St. We decided that the optimal polynomial order for St is 2 for better interpretation.
+Using cross-validation with 5 folds, we see the adjusted $R^2$ decreases as polynomial degree increases. The MSE indicates that linear regression is not sufficient. The minimum MSE is achieved with polynomial order 2 on St. We decided that the optimal polynomial order for St is 2 for better interpretation.
 
 We tried removing data of both high leverage and residual. However, this didn't change the MSE and adjusted $R^2$ greatly. Since these observations take up 7% of the full training data, we decided that we don't want to exclude them.
 
@@ -252,9 +252,7 @@ df %>%
   add_footnote(c("Fr logit-transformed"), notation = "symbol")
 ```
 
-
-Summary: For Raw_moment_1 (mean), GAM has the best results since it presents the highest adjusted $R^2$ and the lowest MSE. The second best model is natural spline, with only slight increase in MSE and decrease in adjusted $R^2$. Since both are hard to interpret, we use it for prediction and polynomial regression for inference.
-
+For Raw_moment_1 (mean), GAM has the best results since it presents the highest adjusted $R^2$ and the lowest MSE. The second best model is natural spline, with only slight increase in MSE. Since both are hard to interpret, we use it for prediction and polynomial regression for inference.
 
 
 ## Raw Moment 2
@@ -539,11 +537,6 @@ df %>%
 ```
 
 ## Raw Moment 3
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
 
 ```{r}
 plot(density(train$St))
