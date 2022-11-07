@@ -16,6 +16,10 @@ library(boot)
 library(splines)
 library(kableExtra)
 library(glmnet)
+# library
+library(ggridges)
+library(ggplot2)
+ 
 ```
 
 ```{r}
@@ -2318,7 +2322,7 @@ test$raw_moment_2 <- fit.pred2
 test$raw_moment_3 <- fit.pred3
 test$raw_moment_4 <- fit.pred4
 test
-#write.csv(test, here::here("data-test.csv"))
+write.csv(test, here::here("data-test.csv"))
 ```
 
 ```{r}
@@ -2330,8 +2334,8 @@ summary(test$raw_moment_1)
 summary(test$raw_moment_2)
 summary(test$raw_moment_3)
 summary(test$raw_moment_4)
-boxplot(test$raw_moment_1,test$raw_moment_2,test$raw_moment_3,test$raw_moment_4, horizontal = TRUE, outline=FALSE)
-boxplot(test$raw_moment_1,test$raw_moment_2, horizontal = TRUE, outline=FALSE)
+boxplot(test$raw_moment_1,test$raw_moment_2,test$raw_moment_3,test$raw_moment_4, horizontal = TRUE)
+boxplot(test$raw_moment_2, horizontal = TRUE)
 boxplot(test$raw_moment_3,test$raw_moment_4, horizontal = TRUE, outline=FALSE)
 ```
 
@@ -2339,4 +2343,11 @@ boxplot(test$raw_moment_3,test$raw_moment_4, horizontal = TRUE, outline=FALSE)
 boxplot(train$R_moment_4, horizontal = TRUE)
 ```
 
+```{r}
+# basic example
+ggplot(boxplot, aes(x = price, y = cut, fill = cut)) +
+  geom_density_ridges() +
+  theme_ridges() + 
+  theme(legend.position = "none")
+```
 
