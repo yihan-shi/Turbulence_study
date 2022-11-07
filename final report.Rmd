@@ -2,7 +2,7 @@
 title: \vspace{-1.25cm} Analyzing and predicting particle clustering in turbulence \vspace{-0.5cm}
 author: "Yihan Shi, Edna Zhang, Medy Mu"
 date: "2022-11-07"
-geometry: margin=1cm
+geometry: margin=1.5cm
 output: pdf_document
 ---
 
