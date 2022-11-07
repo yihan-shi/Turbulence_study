@@ -2,6 +2,7 @@
 title: \vspace{-1.25cm} Analyzing and predicting particle clustering in turbulence \vspace{-0.5cm}
 author: "Yihan Shi, Edna Zhang, Medy Mu"
 date: "2022-11-07"
+geometry: margin=1cm
 output: pdf_document
 ---
 
@@ -212,6 +213,7 @@ Similar to the effects of gravitational acceleration, the effects of particle in
 In addition to the individual effects of Re, Fr, and St, there are statistically significant interaction effects between Re and Fr in all polynomial models. Specifically, the coefficients associated with these interaction effects are positive in all models, suggesting that the stronger the gravity is, the stronger the effects (more positive) of the intensity of turbulent flow on the response variable of interest. 
 
 For predictions, as mentioned above, GAMs were chosen to predict the first to the fourth raw moments in the test set. According to the summary statistics and boxplots, there are two outliers with very large predicted values in the second, third, and fourth raw moments. After a closer examination, the combination of the predictors of interest for these two outliers did not match any observations in the training set. Our GAM models thus might fail to accurately predict those unseen data, pointing to the potential problem with overfitting. However, there are also outliers for higher-order raw moments in the training set, specifically concentrating around Re = 90. The two outliers from the predicted raw moments also have a Re of 90, suggesting that more future work should be done to investigate why observations with a Reynolds number of 90 yield different raw moments from other observations. Moreover, all four predicted raw moments are right skewed, which is similar to the raw moments in the training data.
+
 ```{r, fig.height=3.5}
 test <- read.csv("data-test.csv")
 boxplot(test$raw_moment_1,test$raw_moment_2,test$raw_moment_3,test$raw_moment_4, horizontal = TRUE, outline=FALSE,
@@ -232,4 +234,9 @@ Aside from the average size of particle cluster, variance, skewness and the exte
 
 The above insights into the physical characteristics of particle clusters has allowed us to make predictions of unknown distributions using GAM model. Although the GAM model might not be able to explain changes in particle clusters well when flow intensity is at a specific level (Reynolds number = 90), the properties of predicted distribution generally match the model’s trend. One potential reason is that this level of flow intensity is known to be a threshold between laminar and turbulent behavior in a cylinder. Therefore, more context such as the shape of container is needed to refine the model. Future work should also investigate the behavior of turbulence at this specific level of flow intensity.
 
+## Reference
+
+The inherently stable channel with online computation, open channel hydraulics, hydraulics, hydraulic engineering, Victor M. Ponce, Marcela I. Diaz, San Diego State University. (n.d.). http://ponce.sdsu.edu/the_inherently_stable_channel_with_online_computation.html
+
+Wikipedia contributors. (2022, September 4). Reynolds number. Wikipedia. https://en.wikipedia.org/wiki/Reynolds_number
 
